@@ -2,7 +2,7 @@
 import { Asset, PricePoint } from '../types';
 import { fetchLatestPricesViaAI } from './geminiService';
 
-const STORAGE_KEY = 'invest_pilot_prices_v4'; // Legacy price-only cache for fallback logic
+const STORAGE_KEY = 'invest_pilot_prices_v4'; // Legacy price-only cache
 const ASSET_CACHE_KEY = 'invest_pilot_assets_cache_v1'; // Full state cache
 
 // Backup Base Prices (Used only if ALL APIs fail)
@@ -40,11 +40,12 @@ const saveCache = (newPrices: Record<string, number>) => {
   }
 };
 
+// New: Persist full asset state
 const saveAssetsCache = (assets: Asset[]) => {
   try {
     localStorage.setItem(ASSET_CACHE_KEY, JSON.stringify(assets));
   } catch (e) {
-    // Ignore cache errors
+    console.warn("Failed to save asset cache", e);
   }
 };
 
@@ -138,7 +139,7 @@ export const getHistoryForTimeframe = (basePrice: number, timeframe: string): Pr
 };
 
 export const getInitialAssets = (): Asset[] => {
-  // 1. Define the default structure (Source of Truth for Schema)
+  // 1. Define the default structure
   const defaults: Asset[] = [
     {
       id: 'sh_composite',
@@ -274,24 +275,22 @@ export const getInitialAssets = (): Asset[] => {
     },
   ];
 
-  // 2. Attempt to hydrate from cache
+  // 2. Attempt to hydrate from cache to restore latest state
   try {
     const saved = localStorage.getItem(ASSET_CACHE_KEY);
     if (saved) {
       const cachedAssets: Asset[] = JSON.parse(saved);
-      // Create a map for faster lookup
       const cacheMap = new Map(cachedAssets.map(a => [a.id, a]));
 
       return defaults.map(def => {
         const cached = cacheMap.get(def.id);
         if (cached) {
-          // Merge cached data into default structure to ensure schema compatibility
+          // Merge cached data into default structure
           return {
              ...def,
              price: cached.price,
              change: cached.change,
              changePercent: cached.changePercent,
-             // Use cached history if available, otherwise use default random history
              history: (cached.history && cached.history.length > 0) ? cached.history : def.history,
              lastChecked: cached.lastChecked,
              sources: cached.sources
@@ -311,7 +310,6 @@ export const updateAssetPrice = (asset: Asset): Asset => {
   if (!asset.history || asset.history.length === 0) return asset;
 
   // Pure visual tick (micro-movements)
-  // Ensure price is a number to avoid NaN
   const safePrice = typeof asset.price === 'number' && !isNaN(asset.price) ? asset.price : (BASE_PRICES[asset.id] || 0);
   const volatility = safePrice * 0.00005; 
   const change = (Math.random() - 0.5) * volatility;
@@ -321,7 +319,6 @@ export const updateAssetPrice = (asset: Asset): Asset => {
   const priceChange = newPrice - openPrice;
   const percentChange = openPrice !== 0 ? (priceChange / openPrice) * 100 : 0;
 
-  // Use toFixed(4) to display all significant decimals
   return {
     ...asset,
     price: parseFloat(newPrice.toFixed(4)),
@@ -354,14 +351,12 @@ const fetchSinaData = async (): Promise<Record<string, number>> => {
       try {
         const s = document.getElementById(scriptId);
         if (s) s.remove();
-        // Do NOT delete window properties here as other concurrent requests might need them
-        // or just let them stay as they are small strings.
       } catch(e) {}
     };
 
     const timer = setTimeout(() => {
       cleanup();
-      resolve({});
+      resolve({} as Record<string, number>);
     }, 2500); 
 
     try {
@@ -412,21 +407,21 @@ const fetchSinaData = async (): Promise<Record<string, number>> => {
           resolve(results);
         } catch (err) {
           cleanup();
-          resolve({});
+          resolve({} as Record<string, number>);
         }
       };
       
       script.onerror = () => {
         clearTimeout(timer);
         cleanup();
-        resolve({});
+        resolve({} as Record<string, number>);
       };
       
       document.body.appendChild(script);
     } catch (e) {
       clearTimeout(timer);
       cleanup();
-      resolve({});
+      resolve({} as Record<string, number>);
     }
   });
 };
@@ -455,7 +450,7 @@ const fetchTencentData = async (): Promise<Record<string, number>> => {
 
     const timer = setTimeout(() => {
         cleanup();
-        resolve({});
+        resolve({} as Record<string, number>);
     }, 2500);
 
     try {
@@ -488,21 +483,21 @@ const fetchTencentData = async (): Promise<Record<string, number>> => {
           resolve(results);
         } catch (err) {
           cleanup();
-          resolve({});
+          resolve({} as Record<string, number>);
         }
       };
       
       script.onerror = () => {
         clearTimeout(timer);
         cleanup();
-        resolve({});
+        resolve({} as Record<string, number>);
       };
       
       document.body.appendChild(script);
     } catch (e) {
       clearTimeout(timer);
       cleanup();
-      resolve({});
+      resolve({} as Record<string, number>);
     }
   });
 };
@@ -537,7 +532,7 @@ const fetchCryptoData = async (): Promise<Record<string, number>> => {
     
     return map;
   } catch (e) { 
-    return {}; 
+    return {} as Record<string, number>; 
   }
 };
 
@@ -714,7 +709,7 @@ export const fetchRealTimePrices = async (currentAssets: Asset[]): Promise<Asset
     });
 
     saveCache(finalPrices);
-    saveAssetsCache(updatedAssets); // New: Persist full state
+    saveAssetsCache(updatedAssets); // Save full state
     return updatedAssets;
   } catch (e) {
     console.warn("Global Fetch Error", e);
