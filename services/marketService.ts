@@ -1,7 +1,9 @@
+
 import { Asset, PricePoint } from '../types';
 import { fetchLatestPricesViaAI } from './geminiService';
 
-const STORAGE_KEY = 'invest_pilot_prices_v4';
+const STORAGE_KEY = 'invest_pilot_prices_v4'; // Legacy price-only cache for fallback logic
+const ASSET_CACHE_KEY = 'invest_pilot_assets_cache_v1'; // Full state cache
 
 // Backup Base Prices (Used only if ALL APIs fail)
 const BASE_PRICES: Record<string, number> = {
@@ -22,9 +24,9 @@ const BASE_PRICES: Record<string, number> = {
 const loadCache = (): Record<string, number> => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : {};
+    return saved ? JSON.parse(saved) : {} as Record<string, number>;
   } catch (e) {
-    return {};
+    return {} as Record<string, number>;
   }
 };
 
@@ -33,6 +35,14 @@ const saveCache = (newPrices: Record<string, number>) => {
     const current = loadCache();
     const updated = { ...current, ...newPrices };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  } catch (e) {
+    // Ignore cache errors
+  }
+};
+
+const saveAssetsCache = (assets: Asset[]) => {
+  try {
+    localStorage.setItem(ASSET_CACHE_KEY, JSON.stringify(assets));
   } catch (e) {
     // Ignore cache errors
   }
@@ -128,7 +138,8 @@ export const getHistoryForTimeframe = (basePrice: number, timeframe: string): Pr
 };
 
 export const getInitialAssets = (): Asset[] => {
-  return [
+  // 1. Define the default structure (Source of Truth for Schema)
+  const defaults: Asset[] = [
     {
       id: 'sh_composite',
       symbol: '000001.SS',
@@ -159,7 +170,7 @@ export const getInitialAssets = (): Asset[] => {
       name: 'Shanghai Silver',
       nameCN: '上海白银',
       category: 'metal',
-      unit: 'CNY/g', // Changed unit to CNY/g
+      unit: 'CNY/g', 
       price: BASE_PRICES.sh_silver,
       change: 0,
       changePercent: 0,
@@ -262,6 +273,38 @@ export const getInitialAssets = (): Asset[] => {
       history: generateHistory(BASE_PRICES.us10y),
     },
   ];
+
+  // 2. Attempt to hydrate from cache
+  try {
+    const saved = localStorage.getItem(ASSET_CACHE_KEY);
+    if (saved) {
+      const cachedAssets: Asset[] = JSON.parse(saved);
+      // Create a map for faster lookup
+      const cacheMap = new Map(cachedAssets.map(a => [a.id, a]));
+
+      return defaults.map(def => {
+        const cached = cacheMap.get(def.id);
+        if (cached) {
+          // Merge cached data into default structure to ensure schema compatibility
+          return {
+             ...def,
+             price: cached.price,
+             change: cached.change,
+             changePercent: cached.changePercent,
+             // Use cached history if available, otherwise use default random history
+             history: (cached.history && cached.history.length > 0) ? cached.history : def.history,
+             lastChecked: cached.lastChecked,
+             sources: cached.sources
+          };
+        }
+        return def;
+      });
+    }
+  } catch (e) {
+    console.warn("Failed to load asset cache", e);
+  }
+
+  return defaults;
 };
 
 export const updateAssetPrice = (asset: Asset): Asset => {
@@ -506,10 +549,10 @@ export const fetchRealTimePrices = async (currentAssets: Asset[]): Promise<Asset
   // Wrap all in a big try-catch to prevent crash
   try {
     const [sina, tencent, cnyRate, cryptoData] = await Promise.all([
-      fetchSinaData().catch(() => ({})),
-      fetchTencentData().catch(() => ({})),
+      fetchSinaData().catch(() => ({} as Record<string, number>)),
+      fetchTencentData().catch(() => ({} as Record<string, number>)),
       fetchForexRate().catch(() => 0),
-      fetchCryptoData().catch(() => ({}))
+      fetchCryptoData().catch(() => ({} as Record<string, number>))
     ]);
 
     let finalPrices: Record<string, number> = {};
@@ -671,6 +714,7 @@ export const fetchRealTimePrices = async (currentAssets: Asset[]): Promise<Asset
     });
 
     saveCache(finalPrices);
+    saveAssetsCache(updatedAssets); // New: Persist full state
     return updatedAssets;
   } catch (e) {
     console.warn("Global Fetch Error", e);
