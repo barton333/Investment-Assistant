@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
-import { Asset, MarketAnalysis, Language } from "../types";
+import { Asset, MarketAnalysis, Language, ChatMessage } from "../types";
 
 // Helper to clean JSON string from Markdown code blocks
 const cleanJsonString = (str: string) => {
@@ -196,6 +197,110 @@ export const fetchMarketAnalysis = async (assets: Asset[], lang: Language): Prom
       advice: lang === 'zh' ? "由于AI服务繁忙，建议关注技术面指标进行操作。" : "AI service busy. Trade based on technical indicators.",
       timestamp: Date.now()
     };
+  }
+};
+
+/**
+ * Sends a chat query to Gemini with specific asset context.
+ */
+export const sendChatQuery = async (
+  query: string,
+  selectedAsset: Asset | null,
+  allAssets: Asset[],
+  history: ChatMessage[],
+  lang: Language
+): Promise<string> => {
+  try {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) throw new Error("API Key missing");
+    const ai = new GoogleGenAI({ apiKey });
+
+    // 1. Get Current Date and Time
+    const now = new Date();
+    const dateStr = now.toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', { 
+      timeZone: 'Asia/Shanghai', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric', 
+      weekday: 'long',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    // 2. Build Context
+    let contextStr = `CURRENT DATE & TIME: ${dateStr}\n\n`;
+    
+    if (selectedAsset) {
+      contextStr += `
+        [PRIMARY FOCUS ASSET]
+        Asset: ${lang === 'zh' ? selectedAsset.nameCN : selectedAsset.name} (${selectedAsset.symbol})
+        Price: ${selectedAsset.price} ${selectedAsset.unit}
+        Change: ${selectedAsset.changePercent}%
+        Trend: ${selectedAsset.changePercent >= 0 ? 'Up' : 'Down'}
+      `;
+    }
+
+    // Always provide broader market context
+    const marketOverview = allAssets.map(a => 
+      `${a.symbol}: ${a.price} (${a.changePercent >= 0 ? '+' : ''}${a.changePercent}%)`
+    ).join(' | ');
+    
+    contextStr += `\n[BROADER MARKET CONTEXT]\n${marketOverview}`;
+
+    const systemInstruction = `
+      You are a Senior Financial Analyst with 20 years of experience serving high-net-worth clients in a WeChat Mini Program.
+      
+      YOUR ROLE:
+      - Provide expert, data-driven financial advice.
+      - Be objective, professional, and risk-aware.
+      - Use the provided REAL-TIME MARKET DATA. Do not use outdated training data for prices.
+      
+      CONTEXT:
+      ${contextStr}
+      
+      INSTRUCTIONS:
+      1. **Date Awareness**: Always base your analysis on the "CURRENT DATE & TIME" provided above. If the user asks for the date, state it clearly.
+      2. **Data Usage**: If the user asks about market conditions, cite the specific numbers provided in the context (Price, Change%).
+      3. **Analysis Depth**: 
+         - Explain *why* the market might be moving (correlate with general economic knowledge like Fed rates, geopolitical events, but grounded in today's price action).
+         - Give specific Key Levels (Support/Resistance) based on the price.
+      4. **Tone**: Professional, confident, yet cautious (standard financial disclaimer tone).
+      5. **Language**: Reply STRICTLY in ${lang === 'zh' ? 'Chinese (Simplified)' : 'English'}.
+
+      User Query: "${query}"
+    `;
+
+    // Construct history (limit to last 3 turns)
+    const recentHistory = history.slice(-3).map(msg => 
+      `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.text}`
+    ).join('\n');
+
+    const fullPrompt = `
+      ${systemInstruction}
+      
+      Chat History:
+      ${recentHistory}
+      
+      User: ${query}
+      Assistant:
+    `;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: fullPrompt,
+      // Enable search to look up current news/reasons for moves
+      config: {
+        tools: [{ googleSearch: {} }], 
+      }
+    });
+
+    return response.text || (lang === 'zh' ? '抱歉，我暂时无法回答。' : 'Sorry, I cannot answer right now.');
+
+  } catch (error) {
+    handleGeminiError(error, 'sendChatQuery');
+    return lang === 'zh' 
+      ? 'AI 服务暂时繁忙，请稍后再试。' 
+      : 'AI service is busy, please try again later.';
   }
 };
 

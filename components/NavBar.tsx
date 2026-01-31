@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { TrendingUp, Settings } from 'lucide-react';
+import { TrendingUp, Settings, MessageSquareText } from 'lucide-react';
 import { Tab, Language } from '../types';
 
 interface NavBarProps {
@@ -19,6 +20,7 @@ export const NavBar: React.FC<NavBarProps> = ({ currentTab, onTabChange, lang })
 
   const labels = {
     market: lang === 'zh' ? '行情' : 'Market',
+    advisor: lang === 'zh' ? '顾问' : 'Advisor',
     settings: lang === 'zh' ? '设置' : 'Settings',
   };
 
@@ -27,6 +29,10 @@ export const NavBar: React.FC<NavBarProps> = ({ currentTab, onTabChange, lang })
       <button className={getTabClass('market')} onClick={() => onTabChange('market')}>
         <TrendingUp size={24} />
         <span className="text-[10px] font-medium">{labels.market}</span>
+      </button>
+      <button className={getTabClass('advisor')} onClick={() => onTabChange('advisor')}>
+        <MessageSquareText size={24} />
+        <span className="text-[10px] font-medium">{labels.advisor}</span>
       </button>
       <button className={getTabClass('settings')} onClick={() => onTabChange('settings')}>
         <Settings size={24} />

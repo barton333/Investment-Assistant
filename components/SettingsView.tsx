@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Bell, Clock, ChevronRight, CheckCircle, Moon, Sun, Globe, Zap, Mail, MessageSquare, Activity } from 'lucide-react';
 import { AppSettings, Language, Theme } from '../types';
@@ -29,10 +30,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     onUpdateSettings({ ...settings, language });
   };
 
-  const handleRefreshChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onUpdateSettings({ ...settings, refreshRate: parseInt(e.target.value) });
-  };
-
   const handleDataRefreshChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     onUpdateSettings({ ...settings, dataRefreshRate: parseInt(e.target.value) });
   };
@@ -49,7 +46,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     general: isZh ? '通用设置' : 'General',
     theme: isZh ? '主题模式' : 'Theme',
     language: isZh ? '语言' : 'Language',
-    visualRefresh: isZh ? '动画频率' : 'Animation Speed',
     dataRefresh: isZh ? '数据刷新' : 'Data Refresh',
     notifications: isZh ? '消息通知' : 'Notifications',
     wechatNotify: isZh ? '微信推送' : 'WeChat Notify',
@@ -127,8 +123,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
           </div>
         </div>
 
-        {/* Data Refresh Rate (NEW) */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800">
+        {/* Data Refresh Rate */}
+        <div className="flex items-center justify-between p-4">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
               <Clock size={18} />
@@ -144,26 +140,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             <option value={300000}>5 {text.minute}</option>
             <option value={900000}>15 {text.minute}</option>
             <option value={1800000}>30 {text.minute}</option>
-          </select>
-        </div>
-
-        {/* Animation Refresh Rate (Renamed from visualRefresh) */}
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-full bg-yellow-50 dark:bg-yellow-900/30 flex items-center justify-center text-yellow-600">
-              <Activity size={18} />
-            </div>
-            <span className="text-sm font-medium">{text.visualRefresh}</span>
-          </div>
-          <select 
-            value={settings.refreshRate}
-            onChange={handleRefreshChange}
-            className="bg-gray-100 dark:bg-gray-800 text-sm rounded-lg px-3 py-1.5 focus:outline-none border-none dark:text-white"
-          >
-            <option value={1000}>1 {text.seconds}</option>
-            <option value={3000}>3 {text.seconds}</option>
-            <option value={5000}>5 {text.seconds}</option>
-            <option value={10000}>10 {text.seconds}</option>
           </select>
         </div>
       </div>

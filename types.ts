@@ -1,3 +1,4 @@
+
 export interface PricePoint {
   time: string;
   value: number;
@@ -28,14 +29,13 @@ export interface MarketAnalysis {
   timestamp: number;
 }
 
-export type Tab = 'market' | 'settings'; // Removed 'analysis'
+export type Tab = 'market' | 'advisor' | 'settings';
 export type Language = 'zh' | 'en';
 export type Theme = 'light' | 'dark';
 
 export interface AppSettings {
   language: Language;
   theme: Theme;
-  refreshRate: number; // milliseconds (visual tick)
   dataRefreshRate: number; // milliseconds (API data fetch)
   notifications: {
     wechat: boolean;
@@ -43,4 +43,13 @@ export interface AppSettings {
     email: boolean;
     priceAlerts: boolean;
   };
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'model';
+  text: string;
+  timestamp: number;
+  relatedAssetId?: string; // If the message was about a specific asset
+  isSeparator?: boolean; // New field to mark session breaks
 }

@@ -1,11 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
-import { getInitialAssets, updateAssetPrice, fetchRealTimePrices } from './services/marketService';
+import { getInitialAssets, fetchRealTimePrices } from './services/marketService';
 import { Asset, Tab, AppSettings } from './types';
 import { NavBar } from './components/NavBar';
 import { AssetCard } from './components/AssetCard';
 import { AssetDetailView } from './components/AssetDetailView'; 
 import { SettingsView } from './components/SettingsView';
-import { RefreshCw, CheckCircle2, ShieldCheck, Clock } from 'lucide-react';
+import { AdvisorView } from './components/AdvisorView';
+import { RefreshCw, ShieldCheck } from 'lucide-react';
 
 const App: React.FC = () => {
   const [assets, setAssets] = useState<Asset[]>(getInitialAssets());
@@ -18,7 +20,6 @@ const App: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>({
     language: 'zh',
     theme: 'dark', 
-    refreshRate: 3000, // Visual tick rate (fluctuation)
     dataRefreshRate: 300000, // Real Data Fetch (Default 5 min)
     notifications: {
       wechat: true,
@@ -37,18 +38,7 @@ const App: React.FC = () => {
     }
   }, [settings.theme]);
 
-  // 1. Visual Liveness Tick (Simulated noise)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setAssets(currentAssets => 
-        currentAssets.map(asset => updateAssetPrice(asset))
-      );
-    }, settings.refreshRate); 
-
-    return () => clearInterval(interval);
-  }, [settings.refreshRate]);
-
-  // 2. Real-Time Data Fetcher (Controlled by settings.dataRefreshRate)
+  // Real-Time Data Fetcher (Controlled by settings.dataRefreshRate)
   const syncRealData = async () => {
     if (isUpdating) return;
     setIsUpdating(true);
@@ -170,6 +160,10 @@ const App: React.FC = () => {
               <span>{labels.disclaimer}</span>
             </div>
           </div>
+        );
+      case 'advisor':
+        return (
+          <AdvisorView assets={assets} lang={settings.language} />
         );
       case 'settings':
         return (
