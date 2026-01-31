@@ -1,0 +1,246 @@
+import { GoogleGenAI, Type } from "@google/genai";
+import { Asset, MarketAnalysis, Language } from "../types";
+
+// Helper to clean JSON string from Markdown code blocks
+const cleanJsonString = (str: string) => {
+  if (!str) return "";
+  let cleaned = str.trim();
+  // Remove markdown code blocks if present
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```(json)?\n?/, "").replace(/\n?```$/, "");
+  }
+  return cleaned;
+};
+
+// Helper to handle API errors
+const handleGeminiError = (error: any, context: string): void => {
+  const msg = error?.message || '';
+  // Check for various forms of Rate Limit / Quota errors
+  if (msg.includes('429') || msg.includes('Quota') || error?.status === 'RESOURCE_EXHAUSTED' || error?.code === 429) {
+    console.warn(`[Gemini Service] Quota exceeded during ${context}. Switched to local fallback analysis.`);
+  } else {
+    console.error(`[Gemini Service] Error during ${context}:`, error);
+  }
+};
+
+/**
+ * Generates a rule-based analysis when AI is unavailable.
+ */
+const getFallbackAnalysis = (
+  name: string, 
+  price: number, 
+  changePercent: number, 
+  lang: Language
+): MarketAnalysis => {
+  const isUp = changePercent >= 0;
+  const absChange = Math.abs(changePercent);
+  
+  let sentiment: 'Bullish' | 'Bearish' | 'Neutral' = 'Neutral';
+  if (changePercent > 0.5) sentiment = 'Bullish';
+  else if (changePercent < -0.5) sentiment = 'Bearish';
+
+  // Support/Resistance heuristic
+  const support = (price * (1 - (absChange > 1 ? 0.02 : 0.01))).toFixed(2);
+  const resistance = (price * (1 + (absChange > 1 ? 0.02 : 0.01))).toFixed(2);
+
+  let summaryCN = `当前${name}价格为 ${price}，日内${isUp ? '上涨' : '下跌'} ${changePercent.toFixed(2)}%。`;
+  let summaryEN = `${name} is currently trading at ${price}, ${isUp ? 'up' : 'down'} ${changePercent.toFixed(2)}% intraday.`;
+
+  let adviceCN = "市场波动处于正常范围，建议继续持有观望。";
+  let adviceEN = "Market volatility is within normal range. Hold and watch.";
+
+  if (absChange > 2) {
+    summaryCN += " 市场出现较大波动，请注意风险。";
+    summaryEN += " Significant volatility detected.";
+    adviceCN = "短期波动剧烈，建议谨慎操作，注意止损。";
+    adviceEN = "High volatility. Exercise caution and manage risk.";
+  }
+
+  return {
+    summary: lang === 'zh' ? summaryCN : summaryEN,
+    sentiment: sentiment,
+    keyLevels: `${support} (S) / ${resistance} (R)`,
+    advice: lang === 'zh' ? adviceCN : adviceEN,
+    timestamp: Date.now()
+  };
+};
+
+export const fetchAssetAnalysis = async (asset: Asset, lang: Language): Promise<MarketAnalysis> => {
+  try {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) throw new Error("API Key missing");
+
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    const assetContext = `
+      Asset: ${lang === 'zh' ? asset.nameCN : asset.name} (${asset.symbol})
+      Current Price: ${asset.price} ${asset.unit}
+      Change: ${asset.changePercent}%
+      Category: ${asset.category}
+    `;
+
+    const prompt = `
+      You are a professional financial analyst for a WeChat investment Mini Program.
+      Perform a deep-dive analysis for the following SPECIFIC asset:
+      ${assetContext}
+
+      Provide a concise, professional analysis.
+      The output language MUST be in ${lang === 'zh' ? 'Chinese (Simplified)' : 'English'}.
+      
+      Requirements:
+      1. Summary: What is happening with this specific asset right now?
+      2. Sentiment: Bullish, Bearish, or Neutral based on the price action.
+      3. Key Levels: Identify immediate support and resistance prices based on the price.
+      4. Advice: Actionable strategy (e.g., "Wait for pullback", "Accumulate", "Watch 2600 level").
+    `;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            summary: { type: Type.STRING, description: "Specific analysis of the asset's current move." },
+            sentiment: { type: Type.STRING, enum: ["Bullish", "Bearish", "Neutral"] },
+            keyLevels: { type: Type.STRING, description: "Support and Resistance prices." },
+            advice: { type: Type.STRING, description: "Clear trading or investment advice." }
+          },
+          required: ["summary", "sentiment", "keyLevels", "advice"]
+        }
+      }
+    });
+
+    const jsonText = response.text;
+    if (!jsonText) throw new Error("Empty response from AI");
+
+    const result = JSON.parse(cleanJsonString(jsonText));
+    return { ...result, timestamp: Date.now() };
+
+  } catch (error) {
+    handleGeminiError(error, 'fetchAssetAnalysis');
+    // Return Fallback instead of error message
+    return getFallbackAnalysis(
+      lang === 'zh' ? asset.nameCN : asset.name, 
+      asset.price, 
+      asset.changePercent, 
+      lang
+    );
+  }
+};
+
+export const fetchMarketAnalysis = async (assets: Asset[], lang: Language): Promise<MarketAnalysis> => {
+  try {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) throw new Error("API Key missing");
+
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    const assetsSummary = assets.map(a => 
+      `- ${lang === 'zh' ? a.nameCN : a.name} (${a.symbol}): ${a.price} ${a.unit} (${a.changePercent > 0 ? '+' : ''}${a.changePercent}%)`
+    ).join('\n');
+
+    const prompt = `
+      You are a professional financial analyst for a WeChat investment Mini Program.
+      Perform a comprehensive market analysis based on the following asset prices:
+      ${assetsSummary}
+
+      Provide a concise, professional market summary.
+      The output language MUST be in ${lang === 'zh' ? 'Chinese (Simplified)' : 'English'}.
+      
+      Requirements:
+      1. Summary: General market overview based on these major assets (Indices, Gold, Commodities, Forex).
+      2. Sentiment: Overall Market Sentiment (Bullish, Bearish, or Neutral).
+      3. Key Levels: Mention key levels for the most significant movers (e.g. Gold or Indices).
+      4. Advice: General investment strategy for today.
+    `;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            summary: { type: Type.STRING, description: "Market overview." },
+            sentiment: { type: Type.STRING, enum: ["Bullish", "Bearish", "Neutral"] },
+            keyLevels: { type: Type.STRING, description: "Key levels for major assets." },
+            advice: { type: Type.STRING, description: "General strategy." }
+          },
+          required: ["summary", "sentiment", "keyLevels", "advice"]
+        }
+      }
+    });
+
+    const jsonText = response.text;
+    if (!jsonText) throw new Error("Empty response from AI");
+
+    const result = JSON.parse(cleanJsonString(jsonText));
+    return { ...result, timestamp: Date.now() };
+
+  } catch (error) {
+    handleGeminiError(error, 'fetchMarketAnalysis');
+    
+    // Simple aggregate fallback
+    const upCount = assets.filter(a => a.changePercent > 0).length;
+    const isBullish = upCount > assets.length / 2;
+    
+    return {
+      summary: lang === 'zh' 
+        ? `市场整体呈现${isBullish ? '上涨' : '调整'}态势。黄金与主要指数保持活跃交易。` 
+        : `Market is showing a ${isBullish ? 'bullish' : 'correction'} trend. Gold and major indices are active.`,
+      sentiment: isBullish ? "Bullish" : "Bearish",
+      keyLevels: lang === 'zh' ? "关注黄金支撑位与美元阻力位" : "Watch Gold support and USD resistance",
+      advice: lang === 'zh' ? "由于AI服务繁忙，建议关注技术面指标进行操作。" : "AI service busy. Trade based on technical indicators.",
+      timestamp: Date.now()
+    };
+  }
+};
+
+/**
+ * Uses Gemini with Google Search Grounding to find real-time prices 
+ * for assets that could not be fetched via standard APIs.
+ */
+export const fetchLatestPricesViaAI = async (assetsToFetch: Asset[]): Promise<Record<string, number>> => {
+  try {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey || assetsToFetch.length === 0) return {};
+
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    const targets = assetsToFetch.map(a => `${a.name} (${a.symbol})`).join(', ');
+    
+    const prompt = `
+      Find the absolute latest real-time market price for the following assets: ${targets}.
+      Use Google Search to ensure the data is current as of right now.
+      
+      Return ONLY a JSON object where the keys are the asset IDs provided below and values are the numeric prices.
+      Do not include currency symbols in the number.
+      
+      Asset IDs to use as keys:
+      ${assetsToFetch.map(a => `${a.name}: "${a.id}"`).join('\n')}
+    `;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+      }
+    });
+
+    const jsonText = response.text;
+    if (!jsonText) return {};
+
+    // Note: When using tools + JSON, sometimes the text needs cleaning
+    const result = JSON.parse(cleanJsonString(jsonText));
+    return result;
+
+  } catch (error) {
+    handleGeminiError(error, 'fetchLatestPricesViaAI');
+    return {};
+  }
+};
