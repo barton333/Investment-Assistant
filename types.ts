@@ -38,6 +38,7 @@ export interface AppSettings {
   theme: Theme;
   dataRefreshRate: number; // milliseconds (API data fetch)
   customApiKey?: string; // User entered API Key
+  apiBaseUrl?: string; // User entered Custom Proxy URL (e.g., https://my-proxy.com)
   notifications: {
     wechat: boolean;
     sms: boolean;

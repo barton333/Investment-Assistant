@@ -20,10 +20,11 @@ const App: React.FC = () => {
   // App Settings State
   const [settings, setSettings] = useState<AppSettings>(() => {
     // Attempt to load settings from local storage if needed
-    // For now, specifically loading the custom API Key
     let storedKey = '';
+    let storedBaseUrl = '';
     try {
         storedKey = localStorage.getItem('user_custom_api_key') || '';
+        storedBaseUrl = localStorage.getItem('user_api_base_url') || '';
     } catch(e) {}
 
     return {
@@ -31,6 +32,7 @@ const App: React.FC = () => {
         theme: 'dark', 
         dataRefreshRate: 60000, 
         customApiKey: storedKey,
+        apiBaseUrl: storedBaseUrl,
         notifications: {
           wechat: true,
           sms: false,
@@ -40,13 +42,19 @@ const App: React.FC = () => {
     };
   });
 
-  // Persist Custom API Key logic
+  // Persist Custom API Key and Base URL logic
   useEffect(() => {
     try {
         if (settings.customApiKey) {
             localStorage.setItem('user_custom_api_key', settings.customApiKey);
         } else {
             localStorage.removeItem('user_custom_api_key');
+        }
+        
+        if (settings.apiBaseUrl) {
+            localStorage.setItem('user_api_base_url', settings.apiBaseUrl);
+        } else {
+             localStorage.removeItem('user_api_base_url');
         }
     } catch(e) {}
 
@@ -58,7 +66,7 @@ const App: React.FC = () => {
         setConfigError(true);
     }
 
-  }, [settings.customApiKey]);
+  }, [settings.customApiKey, settings.apiBaseUrl]);
 
   // Apply dark mode
   useEffect(() => {

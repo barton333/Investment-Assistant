@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Bell, Clock, ChevronRight, CheckCircle, Moon, Sun, Globe, Zap, Mail, MessageSquare, Activity, Key, Eye, EyeOff } from 'lucide-react';
+import { Bell, Clock, ChevronRight, CheckCircle, Moon, Sun, Globe, Zap, Mail, MessageSquare, Activity, Key, Eye, EyeOff, Server } from 'lucide-react';
 import { AppSettings, Language, Theme } from '../types';
 
 interface SettingsViewProps {
@@ -39,6 +39,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     onUpdateSettings({ ...settings, customApiKey: e.target.value });
   };
 
+  const handleBaseUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onUpdateSettings({ ...settings, apiBaseUrl: e.target.value });
+  };
+
   const triggerToast = () => {
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2000);
@@ -55,6 +59,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     apiKeyTitle: isZh ? 'API 配置' : 'API Configuration',
     apiKeyLabel: isZh ? 'Google Gemini API Key' : 'Google Gemini API Key',
     apiKeyPlaceholder: isZh ? '在此输入以覆盖默认 Key' : 'Enter key to override default',
+    proxyLabel: isZh ? 'API 代理地址 (Base URL)' : 'API Proxy URL (Base URL)',
+    proxyPlaceholder: isZh ? '例如: https://gemini-proxy.com' : 'e.g., https://gemini-proxy.com',
     notifications: isZh ? '消息通知' : 'Notifications',
     wechatNotify: isZh ? '微信推送' : 'WeChat Notify',
     smsNotify: isZh ? '短信提醒' : 'SMS Alert',
@@ -82,32 +88,51 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
       {/* API Key Settings (High Priority) */}
       <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-2">{text.apiKeyTitle}</h3>
       <div className="bg-white dark:bg-[#1E1E1E] rounded-xl overflow-hidden shadow-sm mb-6 border border-gray-100 dark:border-gray-800 p-4">
-        <div className="flex flex-col space-y-2">
-            <div className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                <Key size={16} className="text-purple-500" />
-                <span>{text.apiKeyLabel}</span>
+        <div className="flex flex-col space-y-4">
+            {/* API Key Input */}
+            <div className="space-y-2">
+                <div className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <Key size={16} className="text-purple-500" />
+                    <span>{text.apiKeyLabel}</span>
+                </div>
+                <div className="relative">
+                    <input 
+                        type={showApiKey ? "text" : "password"}
+                        value={settings.customApiKey || ''}
+                        onChange={handleApiKeyChange}
+                        onBlur={triggerToast} // Auto-save feedback on blur
+                        placeholder={text.apiKeyPlaceholder}
+                        className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all font-mono"
+                    />
+                    <button 
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    >
+                        {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                </div>
             </div>
-            <div className="relative">
+
+            {/* Base URL Input */}
+            <div className="space-y-2">
+                <div className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <Server size={16} className="text-blue-500" />
+                    <span>{text.proxyLabel}</span>
+                </div>
                 <input 
-                    type={showApiKey ? "text" : "password"}
-                    value={settings.customApiKey || ''}
-                    onChange={handleApiKeyChange}
-                    onBlur={triggerToast} // Auto-save feedback on blur
-                    placeholder={text.apiKeyPlaceholder}
-                    className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all font-mono"
+                    type="text"
+                    value={settings.apiBaseUrl || ''}
+                    onChange={handleBaseUrlChange}
+                    onBlur={triggerToast}
+                    placeholder={text.proxyPlaceholder}
+                    className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono"
                 />
-                <button 
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                >
-                    {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+                 <p className="text-[10px] text-gray-400 pl-1">
+                    {isZh 
+                        ? '国内用户如果无法连接 AI，请填写中转地址（例如 Cloudflare Worker 地址）。' 
+                        : 'If AI is blocked in your region, enter a proxy URL here.'}
+                </p>
             </div>
-            <p className="text-[10px] text-gray-400 pl-1">
-                {isZh 
-                    ? '您的 Key 仅存储在本地浏览器中，用于访问 Gemini AI 服务。' 
-                    : 'Your key is stored locally in your browser to access Gemini AI.'}
-            </p>
         </div>
       </div>
 

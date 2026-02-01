@@ -14,16 +14,23 @@ const cleanJsonString = (str: string) => {
 };
 
 // Helper: Get the effective API Key (User Setting > Env Variable)
-const getEffectiveApiKey = (): string | undefined => {
+const getEffectiveConfig = (): { apiKey: string | undefined, baseUrl: string | undefined } => {
+  let apiKey = process.env.API_KEY;
+  let baseUrl = undefined;
+
   try {
     const localKey = localStorage.getItem('user_custom_api_key');
     if (localKey && localKey.length > 10) {
-      return localKey;
+      apiKey = localKey;
+    }
+    const localBaseUrl = localStorage.getItem('user_api_base_url');
+    if (localBaseUrl && localBaseUrl.startsWith('http')) {
+        baseUrl = localBaseUrl;
     }
   } catch (e) {
     // ignore local storage error
   }
-  return process.env.API_KEY;
+  return { apiKey, baseUrl };
 };
 
 // Helper to handle API errors
@@ -81,10 +88,10 @@ const getFallbackAnalysis = (
 
 export const fetchAssetAnalysis = async (asset: Asset, lang: Language): Promise<MarketAnalysis> => {
   try {
-    const apiKey = getEffectiveApiKey();
+    const { apiKey, baseUrl } = getEffectiveConfig();
     if (!apiKey) throw new Error("API Key missing");
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey, baseUrl });
     
     const assetContext = `
       Asset: ${lang === 'zh' ? asset.nameCN : asset.name} (${asset.symbol})
@@ -146,10 +153,10 @@ export const fetchAssetAnalysis = async (asset: Asset, lang: Language): Promise<
 
 export const fetchMarketAnalysis = async (assets: Asset[], lang: Language): Promise<MarketAnalysis> => {
   try {
-    const apiKey = getEffectiveApiKey();
+    const { apiKey, baseUrl } = getEffectiveConfig();
     if (!apiKey) throw new Error("API Key missing");
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey, baseUrl });
 
     const assetsSummary = assets.map(a => 
       `- ${lang === 'zh' ? a.nameCN : a.name} (${a.symbol}): ${a.price} ${a.unit} (${a.changePercent > 0 ? '+' : ''}${a.changePercent}%)`
@@ -224,9 +231,9 @@ export const sendChatQuery = async (
   lang: Language
 ): Promise<string> => {
   try {
-    const apiKey = getEffectiveApiKey();
+    const { apiKey, baseUrl } = getEffectiveConfig();
     if (!apiKey) throw new Error("API Key missing");
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey, baseUrl });
 
     // 1. Get Current Date and Time
     const now = new Date();
@@ -314,8 +321,8 @@ export const sendChatQuery = async (
   } catch (error) {
     handleGeminiError(error, 'sendChatQuery');
     return lang === 'zh' 
-      ? 'AI 服务暂时繁忙，请稍后再试（或检查设置中的 API Key）。' 
-      : 'AI service is busy, please try again later (or check API Key in Settings).';
+      ? 'AI 服务暂时繁忙，请稍后再试（或检查设置中的 API Key 和代理地址）。' 
+      : 'AI service is busy, please try again later (or check API Key/Proxy in Settings).';
   }
 };
 
@@ -325,10 +332,10 @@ export const sendChatQuery = async (
  */
 export const fetchLatestPricesViaAI = async (assetsToFetch: Asset[]): Promise<Record<string, number>> => {
   try {
-    const apiKey = getEffectiveApiKey();
+    const { apiKey, baseUrl } = getEffectiveConfig();
     if (!apiKey || assetsToFetch.length === 0) return {};
 
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey, baseUrl });
 
     // Ensure we are asking for "US 10Y Yield" clearly, not just "US10Y" which is ambiguous
     const targets = assetsToFetch.map(a => {
