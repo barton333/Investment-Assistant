@@ -7,7 +7,7 @@ import { AssetCard } from './components/AssetCard';
 import { AssetDetailView } from './components/AssetDetailView'; 
 import { SettingsView } from './components/SettingsView';
 import { AdvisorView } from './components/AdvisorView';
-import { RefreshCw, ShieldCheck, Clock } from 'lucide-react';
+import { RefreshCw, ShieldCheck, Clock, AlertTriangle } from 'lucide-react';
 
 const App: React.FC = () => {
   const [assets, setAssets] = useState<Asset[]>(getInitialAssets());
@@ -15,19 +15,50 @@ const App: React.FC = () => {
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [configError, setConfigError] = useState(false);
   
   // App Settings State
-  const [settings, setSettings] = useState<AppSettings>({
-    language: 'zh',
-    theme: 'dark', 
-    dataRefreshRate: 60000, // Real Data Fetch (Default 1 min for real-time)
-    notifications: {
-      wechat: true,
-      sms: false,
-      email: true,
-      priceAlerts: true,
-    }
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    // Attempt to load settings from local storage if needed
+    // For now, specifically loading the custom API Key
+    let storedKey = '';
+    try {
+        storedKey = localStorage.getItem('user_custom_api_key') || '';
+    } catch(e) {}
+
+    return {
+        language: 'zh',
+        theme: 'dark', 
+        dataRefreshRate: 60000, 
+        customApiKey: storedKey,
+        notifications: {
+          wechat: true,
+          sms: false,
+          email: true,
+          priceAlerts: true,
+        }
+    };
   });
+
+  // Persist Custom API Key logic
+  useEffect(() => {
+    try {
+        if (settings.customApiKey) {
+            localStorage.setItem('user_custom_api_key', settings.customApiKey);
+        } else {
+            localStorage.removeItem('user_custom_api_key');
+        }
+    } catch(e) {}
+
+    // Clear config error if we have a key now
+    if (settings.customApiKey && settings.customApiKey.length > 10) {
+        setConfigError(false);
+    } else if (!process.env.API_KEY || process.env.API_KEY.length < 10) {
+        // Only error if both env AND custom key are missing
+        setConfigError(true);
+    }
+
+  }, [settings.customApiKey]);
 
   // Apply dark mode
   useEffect(() => {
@@ -37,6 +68,18 @@ const App: React.FC = () => {
       document.documentElement.classList.remove('dark');
     }
   }, [settings.theme]);
+
+  // Check for API Key on mount (env check)
+  useEffect(() => {
+    const hasEnvKey = process.env.API_KEY && process.env.API_KEY.length > 10;
+    const hasCustomKey = settings.customApiKey && settings.customApiKey.length > 10;
+
+    if (!hasEnvKey && !hasCustomKey) {
+        setConfigError(true);
+    } else {
+        setConfigError(false);
+    }
+  }, []);
 
   // Real-Time Data Fetcher (Controlled by settings.dataRefreshRate)
   const syncRealData = async () => {
@@ -87,6 +130,8 @@ const App: React.FC = () => {
     disclaimer: isZh ? '数据来源: 智能AI多源核对 (API + Web Search)' : 'Source: AI Verified (API + Web Search)',
     updating: isZh ? '全网搜寻中...' : 'Searching...',
     verified: isZh ? '已更新' : 'Updated',
+    configErr: isZh ? '配置错误: 缺少 API Key' : 'Config Error: Missing API Key',
+    configMsg: isZh ? '请在[设置]页面填写 Gemini API Key。' : 'Please enter Gemini API Key in Settings tab.',
   };
 
   // Consistent formatting for Detail View
@@ -121,6 +166,17 @@ const App: React.FC = () => {
       case 'market':
         return (
           <div className={containerClass}>
+            {/* Config Error Banner */}
+            {configError && (
+              <div className="bg-red-500 text-white p-3 rounded-lg mb-4 text-xs flex items-start space-x-2 shadow-lg animate-pulse cursor-pointer" onClick={() => setCurrentTab('settings')}>
+                 <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
+                 <div>
+                    <div className="font-bold">{labels.configErr}</div>
+                    <div className="opacity-90">{labels.configMsg}</div>
+                 </div>
+              </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col mb-4 px-1 space-y-3">
               <div className="flex justify-between items-center">
@@ -158,7 +214,11 @@ const App: React.FC = () => {
               {/* Status Bar */}
               <div className="flex items-center justify-between text-xs">
                  <div className="flex items-center space-x-2">
-                    <div className="flex items-center space-x-1 text-[10px] text-green-600 dark:text-green-500 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full border border-green-100 dark:border-green-900/30">
+                    <div className={`flex items-center space-x-1 text-[10px] px-2 py-1 rounded-full border ${
+                        configError 
+                            ? 'text-red-500 bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-900' 
+                            : 'text-green-600 dark:text-green-500 bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-900/30'
+                    }`}>
                         {isUpdating ? (
                             <>
                               <RefreshCw size={10} className="animate-spin" />
@@ -167,7 +227,9 @@ const App: React.FC = () => {
                         ) : (
                             <>
                               <ShieldCheck size={10} />
-                              <span>{labels.verified} {lastUpdated.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                              <span>
+                                {configError ? 'Missing API Key' : `${labels.verified} ${lastUpdated.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`}
+                              </span>
                             </>
                         )}
                     </div>

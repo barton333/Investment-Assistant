@@ -5,19 +5,19 @@ import { fetchLatestPricesViaAI } from './geminiService';
 const STORAGE_KEY = 'invest_pilot_prices_v4'; // Legacy price-only cache
 const ASSET_CACHE_KEY = 'invest_pilot_assets_cache_v1'; // Full state cache
 
-// Backup Base Prices (Used only if ALL APIs fail and AI fails)
+// Backup Base Prices (Updated to approximate 2025 levels to reduce fallback shock)
 const BASE_PRICES: Record<string, number> = {
-  sh_composite: 3260.50,
-  sh_gold: 615.20,
-  sh_silver: 7.65, // Converted to per gram (approx 7650 / 1000)
-  sh_copper: 75500.00,
-  sh_nickel: 128000.00,
-  sh_oil: 580.50,
-  usd_cny: 7.2550,
-  btc: 67500.00,
-  nasdaq: 19850.00,
-  dow: 41200.00,
-  us10y: 4.15,
+  sh_composite: 3310.25,
+  sh_gold: 628.50,
+  sh_silver: 7.95, 
+  sh_copper: 76200.00,
+  sh_nickel: 131000.00,
+  sh_oil: 592.10,
+  usd_cny: 7.2850,
+  btc: 68500.00,
+  nasdaq: 20100.00,
+  dow: 42300.00,
+  us10y: 4.25,
 };
 
 // --- CACHE SYSTEM (ONLY FOR LAYOUT RESTORATION, NOT FOR PRICING LOGIC) ---

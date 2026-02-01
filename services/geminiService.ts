@@ -13,6 +13,19 @@ const cleanJsonString = (str: string) => {
   return cleaned;
 };
 
+// Helper: Get the effective API Key (User Setting > Env Variable)
+const getEffectiveApiKey = (): string | undefined => {
+  try {
+    const localKey = localStorage.getItem('user_custom_api_key');
+    if (localKey && localKey.length > 10) {
+      return localKey;
+    }
+  } catch (e) {
+    // ignore local storage error
+  }
+  return process.env.API_KEY;
+};
+
 // Helper to handle API errors
 const handleGeminiError = (error: any, context: string): void => {
   const msg = error?.message || '';
@@ -68,10 +81,10 @@ const getFallbackAnalysis = (
 
 export const fetchAssetAnalysis = async (asset: Asset, lang: Language): Promise<MarketAnalysis> => {
   try {
-    const apiKey = process.env.API_KEY;
+    const apiKey = getEffectiveApiKey();
     if (!apiKey) throw new Error("API Key missing");
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
     
     const assetContext = `
       Asset: ${lang === 'zh' ? asset.nameCN : asset.name} (${asset.symbol})
@@ -133,10 +146,10 @@ export const fetchAssetAnalysis = async (asset: Asset, lang: Language): Promise<
 
 export const fetchMarketAnalysis = async (assets: Asset[], lang: Language): Promise<MarketAnalysis> => {
   try {
-    const apiKey = process.env.API_KEY;
+    const apiKey = getEffectiveApiKey();
     if (!apiKey) throw new Error("API Key missing");
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
 
     const assetsSummary = assets.map(a => 
       `- ${lang === 'zh' ? a.nameCN : a.name} (${a.symbol}): ${a.price} ${a.unit} (${a.changePercent > 0 ? '+' : ''}${a.changePercent}%)`
@@ -211,7 +224,7 @@ export const sendChatQuery = async (
   lang: Language
 ): Promise<string> => {
   try {
-    const apiKey = process.env.API_KEY;
+    const apiKey = getEffectiveApiKey();
     if (!apiKey) throw new Error("API Key missing");
     const ai = new GoogleGenAI({ apiKey });
 
@@ -299,8 +312,8 @@ export const sendChatQuery = async (
   } catch (error) {
     handleGeminiError(error, 'sendChatQuery');
     return lang === 'zh' 
-      ? 'AI 服务暂时繁忙，请稍后再试。' 
-      : 'AI service is busy, please try again later.';
+      ? 'AI 服务暂时繁忙，请稍后再试（或检查设置中的 API Key）。' 
+      : 'AI service is busy, please try again later (or check API Key in Settings).';
   }
 };
 
@@ -310,10 +323,10 @@ export const sendChatQuery = async (
  */
 export const fetchLatestPricesViaAI = async (assetsToFetch: Asset[]): Promise<Record<string, number>> => {
   try {
-    const apiKey = process.env.API_KEY;
+    const apiKey = getEffectiveApiKey();
     if (!apiKey || assetsToFetch.length === 0) return {};
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
 
     const targets = assetsToFetch.map(a => `${a.name} (${a.symbol})`).join(', ');
     

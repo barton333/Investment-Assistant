@@ -37,6 +37,7 @@ export interface AppSettings {
   language: Language;
   theme: Theme;
   dataRefreshRate: number; // milliseconds (API data fetch)
+  customApiKey?: string; // User entered API Key
   notifications: {
     wechat: boolean;
     sms: boolean;

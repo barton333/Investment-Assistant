@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Bell, Clock, ChevronRight, CheckCircle, Moon, Sun, Globe, Zap, Mail, MessageSquare, Activity } from 'lucide-react';
+import { Bell, Clock, ChevronRight, CheckCircle, Moon, Sun, Globe, Zap, Mail, MessageSquare, Activity, Key, Eye, EyeOff } from 'lucide-react';
 import { AppSettings, Language, Theme } from '../types';
 
 interface SettingsViewProps {
@@ -10,6 +10,7 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSettings }) => {
   const [showToast, setShowToast] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
 
   const handleToggle = (key: keyof AppSettings['notifications']) => {
     onUpdateSettings({
@@ -34,6 +35,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     onUpdateSettings({ ...settings, dataRefreshRate: parseInt(e.target.value) });
   };
 
+  const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onUpdateSettings({ ...settings, customApiKey: e.target.value });
+  };
+
   const triggerToast = () => {
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2000);
@@ -47,6 +52,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
     theme: isZh ? '主题模式' : 'Theme',
     language: isZh ? '语言' : 'Language',
     dataRefresh: isZh ? '数据刷新' : 'Data Refresh',
+    apiKeyTitle: isZh ? 'API 配置' : 'API Configuration',
+    apiKeyLabel: isZh ? 'Google Gemini API Key' : 'Google Gemini API Key',
+    apiKeyPlaceholder: isZh ? '在此输入以覆盖默认 Key' : 'Enter key to override default',
     notifications: isZh ? '消息通知' : 'Notifications',
     wechatNotify: isZh ? '微信推送' : 'WeChat Notify',
     smsNotify: isZh ? '短信提醒' : 'SMS Alert',
@@ -68,6 +76,38 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ settings, onUpdateSe
             <h2 className="text-lg font-bold">{text.profile}</h2>
             <p className="text-xs text-gray-500 dark:text-gray-400">{text.vip}</p>
           </div>
+        </div>
+      </div>
+
+      {/* API Key Settings (High Priority) */}
+      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-2">{text.apiKeyTitle}</h3>
+      <div className="bg-white dark:bg-[#1E1E1E] rounded-xl overflow-hidden shadow-sm mb-6 border border-gray-100 dark:border-gray-800 p-4">
+        <div className="flex flex-col space-y-2">
+            <div className="flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                <Key size={16} className="text-purple-500" />
+                <span>{text.apiKeyLabel}</span>
+            </div>
+            <div className="relative">
+                <input 
+                    type={showApiKey ? "text" : "password"}
+                    value={settings.customApiKey || ''}
+                    onChange={handleApiKeyChange}
+                    onBlur={triggerToast} // Auto-save feedback on blur
+                    placeholder={text.apiKeyPlaceholder}
+                    className="w-full bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all font-mono"
+                />
+                <button 
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                    {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+            </div>
+            <p className="text-[10px] text-gray-400 pl-1">
+                {isZh 
+                    ? '您的 Key 仅存储在本地浏览器中，用于访问 Gemini AI 服务。' 
+                    : 'Your key is stored locally in your browser to access Gemini AI.'}
+            </p>
         </div>
       </div>
 
