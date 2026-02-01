@@ -655,12 +655,31 @@ export const fetchRealTimePrices = async (currentAssets: Asset[]): Promise<Asset
       } 
       // Check AI Search result
       else if (aiPrices[asset.id]) {
-        newPrice = aiPrices[asset.id];
-        // SPECIAL: Convert Silver AI result if needed
-        if (asset.id === 'sh_silver' && newPrice > 500) {
-            newPrice = newPrice / 1000;
+        let aiVal = aiPrices[asset.id];
+        
+        // Sanity Check for US10Y: If AI returns > 10, it's probably price not yield. 
+        // If it returns < 10, assume yield. If it returns 0.04, it might be raw decimal.
+        if (asset.id === 'us10y') {
+            if (aiVal > 20) {
+                // Ignore suspicious large number for yield, revert to base to be safe
+                aiVal = 0; 
+            } else if (aiVal < 0.1 && aiVal > 0) {
+                // If AI returns 0.043, convert to 4.3
+                aiVal = aiVal * 100;
+            }
         }
-        sources = ['AI Search']; // Gemini with Google Grounding
+
+        if (aiVal > 0) {
+            newPrice = aiVal;
+            // SPECIAL: Convert Silver AI result if needed
+            if (asset.id === 'sh_silver' && newPrice > 500) {
+                newPrice = newPrice / 1000;
+            }
+            sources = ['AI Search']; // Gemini with Google Grounding
+        } else {
+            // AI returned garbage, keep old price
+            sources = ['Old'];
+        }
       }
       // Fallback: BASE PRICE (Strictly offline fallback, no cache used for logic)
       else {

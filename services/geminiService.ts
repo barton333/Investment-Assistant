@@ -330,17 +330,34 @@ export const fetchLatestPricesViaAI = async (assetsToFetch: Asset[]): Promise<Re
 
     const ai = new GoogleGenAI({ apiKey });
 
-    const targets = assetsToFetch.map(a => `${a.name} (${a.symbol})`).join(', ');
+    // Ensure we are asking for "US 10Y Yield" clearly, not just "US10Y" which is ambiguous
+    const targets = assetsToFetch.map(a => {
+        if (a.id === 'us10y') return 'US 10 Year Treasury Yield live percentage';
+        return `${a.name} (${a.symbol}) live price`;
+    }).join(', ');
     
+    const now = new Date().toISOString();
+
     const prompt = `
-      Find the absolute latest real-time market price for the following assets: ${targets}.
-      Use Google Search to ensure the data is current as of right now.
+      Current Date/Time: ${now}
       
-      Return ONLY a JSON object where the keys are the asset IDs provided below and values are the numeric prices.
-      Do not include currency symbols in the number.
+      Task: Find the current LIVE market price for these assets: ${targets}.
       
-      Asset IDs to use as keys:
-      ${assetsToFetch.map(a => `${a.name}: "${a.id}"`).join('\n')}
+      CRITICAL RULES for accuracy:
+      1. Search for "Live Price" or "Real-time quote". 
+      2. Do NOT use "Previous Close", "Open", or data from yesterday. I need the value RIGHT NOW.
+      3. For "US 10 Year Treasury Yield", return the YIELD percentage (e.g. 4.25), NOT the bond price (e.g. 98.50).
+      4. For Commodities (Gold/Silver/Oil), look for the *active* futures contract price.
+      
+      Return ONLY a JSON object.
+      Keys: Asset IDs ("${assetsToFetch.map(a => a.id).join('", "')}")
+      Values: Number only (No currency symbols, no %).
+      
+      Example Output:
+      {
+        "us10y": 4.25,
+        "sh_gold": 628.5
+      }
     `;
 
     const response = await ai.models.generateContent({
