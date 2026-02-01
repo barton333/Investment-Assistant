@@ -20,7 +20,7 @@ const App: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>({
     language: 'zh',
     theme: 'dark', 
-    dataRefreshRate: 300000, // Real Data Fetch (Default 5 min)
+    dataRefreshRate: 60000, // Real Data Fetch (Default 1 min for real-time)
     notifications: {
       wechat: true,
       sms: false,
@@ -84,9 +84,9 @@ const App: React.FC = () => {
   const labels = {
     title: isZh ? '智能投资助手' : 'Smart Invest Assistant',
     marketTitle: isZh ? '自选行情' : 'Watchlist',
-    disclaimer: isZh ? '数据来源: 智能AI多源核对 (Sina/Yahoo/Bloomberg)' : 'Source: AI Verified (Sina/Yahoo/Bloomberg)',
-    updating: isZh ? '核对中...' : 'Verifying...',
-    verified: isZh ? '已核对' : 'Verified',
+    disclaimer: isZh ? '数据来源: 智能AI多源核对 (API + Web Search)' : 'Source: AI Verified (API + Web Search)',
+    updating: isZh ? '全网搜寻中...' : 'Searching...',
+    verified: isZh ? '已更新' : 'Updated',
   };
 
   // Consistent formatting for Detail View

@@ -5,7 +5,7 @@ import { fetchLatestPricesViaAI } from './geminiService';
 const STORAGE_KEY = 'invest_pilot_prices_v4'; // Legacy price-only cache
 const ASSET_CACHE_KEY = 'invest_pilot_assets_cache_v1'; // Full state cache
 
-// Backup Base Prices (Used only if ALL APIs fail)
+// Backup Base Prices (Used only if ALL APIs fail and AI fails)
 const BASE_PRICES: Record<string, number> = {
   sh_composite: 3260.50,
   sh_gold: 615.20,
@@ -20,7 +20,7 @@ const BASE_PRICES: Record<string, number> = {
   us10y: 4.15,
 };
 
-// --- CACHE SYSTEM ---
+// --- CACHE SYSTEM (ONLY FOR LAYOUT RESTORATION, NOT FOR PRICING LOGIC) ---
 const loadCache = (): Record<string, number> => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -275,7 +275,8 @@ export const getInitialAssets = (): Asset[] => {
     },
   ];
 
-  // 2. Attempt to hydrate from cache to restore latest state
+  // 2. Hydrate from cache ONLY to prevent layout shift initially, 
+  // but status will be updated immediately by fetchRealTimePrices
   try {
     const saved = localStorage.getItem(ASSET_CACHE_KEY);
     if (saved) {
@@ -539,7 +540,7 @@ const fetchCryptoData = async (): Promise<Record<string, number>> => {
 // --- MAIN FETCH ORCHESTRATOR ---
 
 export const fetchRealTimePrices = async (currentAssets: Asset[]): Promise<Asset[]> => {
-  const cachedPrices = loadCache();
+  // NOTE: Cache is purposely ignored here to enforce "Fresh Data Only" rule.
   
   // Wrap all in a big try-catch to prevent crash
   try {
@@ -621,16 +622,17 @@ export const fetchRealTimePrices = async (currentAssets: Asset[]): Promise<Asset
       if (found) {
         finalPrices[asset.id] = newPrice;
       } else {
-        // Mark for AI Search if not simulating us10y
-        if (asset.id !== 'us10y') {
-           missingAssets.push(asset);
-        }
+        // ALWAYS Mark for AI Search if not in standard API
+        // This now includes 'us10y' which was previously simulated
+        missingAssets.push(asset);
       }
     });
 
     // Phase 2: AI Fallback (Gemini Search) for missing assets
+    // This is now aggressive: Anything not found in free APIs triggers a search
     let aiPrices: Record<string, number> = {};
     if (missingAssets.length > 0) {
+       // console.log("Missing assets found, triggering AI Search:", missingAssets.map(a => a.id));
        aiPrices = await fetchLatestPricesViaAI(missingAssets);
     }
 
@@ -660,21 +662,11 @@ export const fetchRealTimePrices = async (currentAssets: Asset[]): Promise<Asset
         }
         sources = ['AI Search']; // Gemini with Google Grounding
       }
-      // Check Cache
-      else if (cachedPrices[asset.id]) {
-        newPrice = cachedPrices[asset.id];
-        sources = ['Cache'];
-      }
-      // Fallback
+      // Fallback: BASE PRICE (Strictly offline fallback, no cache used for logic)
       else {
-        newPrice = BASE_PRICES[asset.id] || asset.price;
-        sources = ['Base'];
-      }
-
-      // Special: US10Y (Simulation)
-      if (asset.id === 'us10y') {
-        newPrice = BASE_PRICES.us10y + ((Math.random() - 0.5) * 0.05);
-        sources = ['Simulated'];
+        // Use last known price to prevent UI jump, or base price if zero
+        newPrice = asset.price || BASE_PRICES[asset.id] || 0;
+        sources = ['Base']; 
       }
 
       // Safety check for NaN
@@ -682,7 +674,7 @@ export const fetchRealTimePrices = async (currentAssets: Asset[]): Promise<Asset
           newPrice = BASE_PRICES[asset.id] || 0;
       }
 
-      // Store for next cache save
+      // Store for next cache save (only for persistence across reloads, not used for logic)
       finalPrices[asset.id] = newPrice;
 
       const safeCurrentPrice = (typeof asset.price === 'number' && !isNaN(asset.price)) ? asset.price : newPrice;
