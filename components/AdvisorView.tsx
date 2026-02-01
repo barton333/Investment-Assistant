@@ -26,8 +26,8 @@ export const AdvisorView: React.FC<AdvisorViewProps> = ({ assets, lang }) => {
       id: 'welcome',
       role: 'model',
       text: lang === 'zh' 
-        ? '你好！我是你的智能投资顾问。我可以根据最新的市场数据为你提供分析。请选择一个产品或直接提问。' 
-        : 'Hello! I am your AI Investment Advisor. I can analyze the market using real-time data. Select an asset or ask a question.',
+        ? '你好！我是你的 AI 智能助手。除了为你分析金融市场，我也能回答任何其他问题（生活、科技、闲聊等）。请问有什么可以帮到你？' 
+        : 'Hello! I am your AI Assistant. I specialize in market analysis, but I can also chat about anything else (Life, Tech, etc). How can I help?',
       timestamp: Date.now()
     }];
   });
@@ -126,7 +126,7 @@ export const AdvisorView: React.FC<AdvisorViewProps> = ({ assets, lang }) => {
     placeholder: lang === 'zh' ? '输入你的问题...' : 'Ask a question...',
     selectContext: lang === 'zh' ? '选择数据上下文:' : 'Context:',
     general: lang === 'zh' ? '全市场' : 'General',
-    advisorTitle: lang === 'zh' ? 'AI 投资顾问' : 'AI Advisor',
+    advisorTitle: lang === 'zh' ? 'AI 智能顾问' : 'AI Assistant',
     newChat: lang === 'zh' ? '新对话' : 'New Chat',
     clear: lang === 'zh' ? '清空' : 'Clear',
   };
