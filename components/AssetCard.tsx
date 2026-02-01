@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { Asset, Language } from '../types';
 import { AreaChart, Area, ResponsiveContainer, YAxis } from 'recharts';
-import { ShieldCheck, WifiOff } from 'lucide-react';
+import { ShieldCheck, WifiOff, MousePointerClick } from 'lucide-react';
 
 interface AssetCardProps {
   asset: Asset;
@@ -30,11 +31,20 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, onClick, lang }) =>
   return (
     <div 
       onClick={onClick}
-      className="bg-white dark:bg-[#1E1E1E] p-4 mb-3 rounded-lg flex items-center justify-between active:bg-gray-50 dark:active:bg-[#2c2c2c] transition-colors shadow-sm dark:shadow-none border border-transparent dark:border-gray-800 relative overflow-hidden"
+      title={lang === 'zh' ? "点击查看详情" : "Click to view details"}
+      className="group cursor-pointer bg-white dark:bg-[#1E1E1E] p-4 mb-3 rounded-lg flex items-center justify-between hover:bg-blue-50/30 dark:hover:bg-[#252525] active:bg-gray-100 dark:active:bg-[#2c2c2c] transition-all duration-300 shadow-sm hover:shadow-md dark:shadow-none hover:border-blue-200 dark:hover:border-blue-900/50 border border-transparent dark:border-gray-800 relative overflow-hidden transform hover:-translate-y-0.5"
     >
+      {/* Hover Hint Badge */}
+      <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 pointer-events-none">
+          <div className="flex items-center space-x-1 bg-white dark:bg-[#2A2A2A] text-blue-600 dark:text-blue-400 text-[9px] px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800/50 shadow-sm">
+             <MousePointerClick size={10} />
+             <span className="font-medium">{lang === 'zh' ? '点击查看' : 'View'}</span>
+          </div>
+      </div>
+
       <div className="flex-1">
         <div className="flex items-center space-x-2">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
             {lang === 'zh' ? asset.nameCN : asset.name}
             </h3>
             {isVerified && (
@@ -53,7 +63,7 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, onClick, lang }) =>
         <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{asset.symbol}</p>
       </div>
 
-      <div className="w-24 h-12 mr-4">
+      <div className="w-24 h-12 mr-4 opacity-80 group-hover:opacity-100 transition-opacity">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={asset.history}>
             <YAxis domain={['dataMin', 'dataMax']} hide />
@@ -70,7 +80,7 @@ export const AssetCard: React.FC<AssetCardProps> = ({ asset, onClick, lang }) =>
       </div>
 
       <div className="text-right min-w-[80px]">
-        <div className={`text-lg font-bold ${isPositive ? 'text-[#F63D34]' : 'text-[#07C160]'}`}>
+        <div className={`text-lg font-bold transition-transform group-hover:scale-105 origin-right ${isPositive ? 'text-[#F63D34]' : 'text-[#07C160]'}`}>
           {formatPrice(asset.price)} <span className="text-[10px] font-normal text-gray-400">{asset.unit}</span>
         </div>
         <div className={`text-xs font-medium px-1.5 py-0.5 rounded inline-block ${

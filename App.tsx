@@ -7,7 +7,7 @@ import { AssetCard } from './components/AssetCard';
 import { AssetDetailView } from './components/AssetDetailView'; 
 import { SettingsView } from './components/SettingsView';
 import { AdvisorView } from './components/AdvisorView';
-import { RefreshCw, ShieldCheck } from 'lucide-react';
+import { RefreshCw, ShieldCheck, Clock } from 'lucide-react';
 
 const App: React.FC = () => {
   const [assets, setAssets] = useState<Asset[]>(getInitialAssets());
@@ -61,6 +61,14 @@ const App: React.FC = () => {
     syncRealData();
   };
 
+  const handleFrequencyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newRate = parseInt(e.target.value);
+    setSettings(prev => ({
+      ...prev,
+      dataRefreshRate: newRate
+    }));
+  };
+
   const handleAssetClick = (id: string) => {
     setSelectedAssetId(id);
   };
@@ -90,6 +98,11 @@ const App: React.FC = () => {
     });
   };
 
+  const getFrequencyLabel = (rate: number) => {
+      const min = rate / 60000;
+      return isZh ? `${min}分钟` : `${min}m`;
+  };
+
   const renderContent = () => {
     if (selectedAssetId && selectedAsset) {
         return (
@@ -112,7 +125,26 @@ const App: React.FC = () => {
             <div className="flex flex-col mb-4 px-1 space-y-3">
               <div className="flex justify-between items-center">
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">{labels.title}</h1>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-3">
+                   
+                   {/* Frequency Selector */}
+                   <div className="relative flex items-center space-x-1 bg-gray-100 dark:bg-gray-800 rounded-full px-3 py-1.5 active:scale-95 transition-transform border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
+                      <Clock size={12} className="text-gray-500 dark:text-gray-400" />
+                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                          {getFrequencyLabel(settings.dataRefreshRate)}
+                      </span>
+                      <select
+                          value={settings.dataRefreshRate}
+                          onChange={handleFrequencyChange}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer appearance-none"
+                      >
+                          <option value={60000}>1 {isZh ? '分钟' : 'min'}</option>
+                          <option value={300000}>5 {isZh ? '分钟' : 'min'}</option>
+                          <option value={900000}>15 {isZh ? '分钟' : 'min'}</option>
+                          <option value={1800000}>30 {isZh ? '分钟' : 'min'}</option>
+                      </select>
+                   </div>
+
                    {/* Manual Refresh Button */}
                    <button 
                      onClick={handleManualRefresh}
