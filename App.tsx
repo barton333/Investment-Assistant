@@ -19,7 +19,6 @@ const App: React.FC = () => {
   
   // App Settings State
   const [settings, setSettings] = useState<AppSettings>(() => {
-    // Attempt to load settings from local storage if needed
     let storedKey = '';
     let storedBaseUrl = '';
     try {
@@ -32,8 +31,8 @@ const App: React.FC = () => {
         theme: 'dark', 
         dataRefreshRate: 60000, 
         customApiKey: storedKey,
-        // Set default proxy if none is stored
-        apiBaseUrl: storedBaseUrl || 'https://falling-disk-1830.barton333.workers.dev',
+        // REMOVED DEFAULT UNSTABLE PROXY. Users must provide their own if in China.
+        apiBaseUrl: storedBaseUrl || '', 
         notifications: {
           wechat: true,
           sms: false,
