@@ -91,8 +91,8 @@ export const fetchAssetAnalysis = async (asset: Asset, lang: Language): Promise<
     const { apiKey, baseUrl } = getEffectiveConfig();
     if (!apiKey) throw new Error("API Key missing");
 
-    // Fix TS2353: Cast options to any to allow baseUrl property
-    const ai = new GoogleGenAI({ apiKey, baseUrl } as any);
+    // @ts-ignore
+    const ai = new GoogleGenAI({ apiKey, baseUrl });
     
     const assetContext = `
       Asset: ${lang === 'zh' ? asset.nameCN : asset.name} (${asset.symbol})
@@ -157,8 +157,8 @@ export const fetchMarketAnalysis = async (assets: Asset[], lang: Language): Prom
     const { apiKey, baseUrl } = getEffectiveConfig();
     if (!apiKey) throw new Error("API Key missing");
 
-    // Fix TS2353: Cast options to any
-    const ai = new GoogleGenAI({ apiKey, baseUrl } as any);
+    // @ts-ignore
+    const ai = new GoogleGenAI({ apiKey, baseUrl });
 
     const assetsSummary = assets.map(a => 
       `- ${lang === 'zh' ? a.nameCN : a.name} (${a.symbol}): ${a.price} ${a.unit} (${a.changePercent > 0 ? '+' : ''}${a.changePercent}%)`
@@ -236,8 +236,8 @@ export const sendChatQuery = async (
     const { apiKey, baseUrl } = getEffectiveConfig();
     if (!apiKey) throw new Error("API Key missing");
     
-    // Fix TS2353: Cast options to any
-    const ai = new GoogleGenAI({ apiKey, baseUrl } as any);
+    // @ts-ignore
+    const ai = new GoogleGenAI({ apiKey, baseUrl });
 
     // 1. Get Current Date and Time
     const now = new Date();
@@ -339,8 +339,8 @@ export const fetchLatestPricesViaAI = async (assetsToFetch: Asset[]): Promise<Re
     const { apiKey, baseUrl } = getEffectiveConfig();
     if (!apiKey || assetsToFetch.length === 0) return {};
 
-    // Fix TS2353: Cast options to any
-    const ai = new GoogleGenAI({ apiKey, baseUrl } as any);
+    // @ts-ignore
+    const ai = new GoogleGenAI({ apiKey, baseUrl });
 
     // Ensure we are asking for "US 10Y Yield" clearly, not just "US10Y" which is ambiguous
     const targets = assetsToFetch.map(a => {
