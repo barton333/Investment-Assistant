@@ -19,7 +19,9 @@ try {
            cleanBase = 'https://' + cleanBase;
          }
          // Replace host
-         resource = resource.replace(`https://${targetHost}`, cleanBase);
+         const newUrl = resource.replace(`https://${targetHost}`, cleanBase);
+         console.log(`[Proxy] Redirecting Gemini request to: ${newUrl}`);
+         resource = newUrl;
       }
     } catch (e) {
       // ignore

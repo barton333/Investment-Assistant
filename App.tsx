@@ -32,7 +32,8 @@ const App: React.FC = () => {
         theme: 'dark', 
         dataRefreshRate: 60000, 
         customApiKey: storedKey,
-        apiBaseUrl: storedBaseUrl,
+        // Set default proxy if none is stored
+        apiBaseUrl: storedBaseUrl || 'https://falling-disk-1830.barton333.workers.dev',
         notifications: {
           wechat: true,
           sms: false,
