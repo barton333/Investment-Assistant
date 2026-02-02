@@ -2,6 +2,42 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Asset, MarketAnalysis, Language, ChatMessage } from "../types";
 
+// --- GLOBAL FETCH INTERCEPTOR FOR PROXY SUPPORT ---
+// We use a robust patching method to ensure we can intercept requests
+// even in environments where window.fetch might be protected.
+try {
+  const originalFetch = window.fetch;
+  const proxyFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    let resource = input;
+    try {
+      const savedBaseUrl = localStorage.getItem('user_api_base_url');
+      const targetHost = 'generativelanguage.googleapis.com';
+      
+      if (savedBaseUrl && typeof resource === 'string' && resource.includes(targetHost)) {
+         let cleanBase = savedBaseUrl.trim().replace(/\/$/, '');
+         if (!cleanBase.startsWith('http')) {
+           cleanBase = 'https://' + cleanBase;
+         }
+         // Replace host
+         resource = resource.replace(`https://${targetHost}`, cleanBase);
+      }
+    } catch (e) {
+      // ignore
+    }
+    return originalFetch(resource, init);
+  };
+
+  // Attempt to override window.fetch
+  // Use Object.defineProperty to bypass potential "getter only" or read-only restrictions
+  Object.defineProperty(window, 'fetch', {
+    value: proxyFetch,
+    writable: true,
+    configurable: true
+  });
+} catch (e) {
+  console.warn("[Gemini Service] Failed to install proxy interceptor. Custom Base URL may not work.", e);
+}
+
 // Helper to clean JSON string from Markdown code blocks
 const cleanJsonString = (str: string) => {
   if (!str) return "";
@@ -14,23 +50,18 @@ const cleanJsonString = (str: string) => {
 };
 
 // Helper: Get the effective API Key (User Setting > Env Variable)
-const getEffectiveConfig = (): { apiKey: string | undefined, baseUrl: string | undefined } => {
+const getEffectiveConfig = (): { apiKey: string | undefined } => {
   let apiKey = process.env.API_KEY;
-  let baseUrl = undefined;
 
   try {
     const localKey = localStorage.getItem('user_custom_api_key');
     if (localKey && localKey.length > 10) {
       apiKey = localKey;
     }
-    const localBaseUrl = localStorage.getItem('user_api_base_url');
-    if (localBaseUrl && localBaseUrl.startsWith('http')) {
-        baseUrl = localBaseUrl;
-    }
   } catch (e) {
     // ignore local storage error
   }
-  return { apiKey, baseUrl };
+  return { apiKey };
 };
 
 // Helper to handle API errors
@@ -88,11 +119,10 @@ const getFallbackAnalysis = (
 
 export const fetchAssetAnalysis = async (asset: Asset, lang: Language): Promise<MarketAnalysis> => {
   try {
-    const { apiKey, baseUrl } = getEffectiveConfig();
+    const { apiKey } = getEffectiveConfig();
     if (!apiKey) throw new Error("API Key missing");
 
-    // @ts-ignore
-    const ai = new GoogleGenAI({ apiKey, baseUrl });
+    const ai = new GoogleGenAI({ apiKey });
     
     const assetContext = `
       Asset: ${lang === 'zh' ? asset.nameCN : asset.name} (${asset.symbol})
@@ -154,11 +184,10 @@ export const fetchAssetAnalysis = async (asset: Asset, lang: Language): Promise<
 
 export const fetchMarketAnalysis = async (assets: Asset[], lang: Language): Promise<MarketAnalysis> => {
   try {
-    const { apiKey, baseUrl } = getEffectiveConfig();
+    const { apiKey } = getEffectiveConfig();
     if (!apiKey) throw new Error("API Key missing");
 
-    // @ts-ignore
-    const ai = new GoogleGenAI({ apiKey, baseUrl });
+    const ai = new GoogleGenAI({ apiKey });
 
     const assetsSummary = assets.map(a => 
       `- ${lang === 'zh' ? a.nameCN : a.name} (${a.symbol}): ${a.price} ${a.unit} (${a.changePercent > 0 ? '+' : ''}${a.changePercent}%)`
@@ -233,11 +262,10 @@ export const sendChatQuery = async (
   lang: Language
 ): Promise<string> => {
   try {
-    const { apiKey, baseUrl } = getEffectiveConfig();
+    const { apiKey } = getEffectiveConfig();
     if (!apiKey) throw new Error("API Key missing");
     
-    // @ts-ignore
-    const ai = new GoogleGenAI({ apiKey, baseUrl });
+    const ai = new GoogleGenAI({ apiKey });
 
     // 1. Get Current Date and Time
     const now = new Date();
@@ -336,11 +364,10 @@ export const sendChatQuery = async (
  */
 export const fetchLatestPricesViaAI = async (assetsToFetch: Asset[]): Promise<Record<string, number>> => {
   try {
-    const { apiKey, baseUrl } = getEffectiveConfig();
+    const { apiKey } = getEffectiveConfig();
     if (!apiKey || assetsToFetch.length === 0) return {};
 
-    // @ts-ignore
-    const ai = new GoogleGenAI({ apiKey, baseUrl });
+    const ai = new GoogleGenAI({ apiKey });
 
     // Ensure we are asking for "US 10Y Yield" clearly, not just "US10Y" which is ambiguous
     const targets = assetsToFetch.map(a => {
