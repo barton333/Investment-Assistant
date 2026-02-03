@@ -4,7 +4,7 @@ export interface PricePoint {
   value: number;
 }
 
-export type AssetCategory = 'metal' | 'currency' | 'crypto' | 'energy' | 'index' | 'bond';
+export type AssetCategory = 'metal' | 'currency' | 'crypto' | 'energy' | 'index' | 'bond' | 'stock';
 
 export interface Asset {
   id: string;
@@ -32,13 +32,16 @@ export interface MarketAnalysis {
 export type Tab = 'market' | 'advisor' | 'settings';
 export type Language = 'zh' | 'en';
 export type Theme = 'light' | 'dark';
+export type BadgePosition = 'name-right' | 'card-top-right' | 'card-bottom-right';
 
 export interface AppSettings {
   language: Language;
   theme: Theme;
   dataRefreshRate: number; // milliseconds (API data fetch)
   customApiKey?: string; // User entered API Key
-  apiBaseUrl?: string; // User entered Custom Proxy URL (e.g., https://my-proxy.com)
+  apiBaseUrl?: string; // User entered Custom Proxy URL
+  visibleAssets: string[]; // List of Asset IDs to display
+  badgePosition: BadgePosition; // Where to show the source badge
   notifications: {
     wechat: boolean;
     sms: boolean;
