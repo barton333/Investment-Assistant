@@ -364,9 +364,9 @@ export const fetchRealTimePrices = async (currentAssets: Asset[]): Promise<Asset
   // STRICT FLOW: API -> AI -> Cache -> Offline
   try {
     const [sinaData, cnyRate, cryptoData] = await Promise.all([
-      fetchSinaData().catch(() => ({})),
+      fetchSinaData().catch(() => ({} as Record<string, number>)),
       fetchForexRate().catch(() => 0),
-      fetchCryptoData().catch(() => ({}))
+      fetchCryptoData().catch(() => ({} as Record<string, number>))
     ]);
 
     const validCny = cnyRate || BASE_PRICES.usd_cny;
