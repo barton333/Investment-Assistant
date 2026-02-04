@@ -30,6 +30,7 @@ export const AssetPicker: React.FC<AssetPickerProps> = ({ allAssets, visibleAsse
     // Native Drag and Drop Handlers
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>, position: number) => {
         dragItem.current = position;
+        // Optional: styling for the drag image
         e.dataTransfer.effectAllowed = "move";
     };
 

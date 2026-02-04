@@ -19,7 +19,7 @@ const loadCache = (): Record<string, number> => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     return saved ? JSON.parse(saved) : {} as Record<string, number>;
-  } catch (e) { return {}; }
+  } catch (e) { return {} as Record<string, number>; }
 };
 
 const saveCache = (newPrices: Record<string, number>) => {
@@ -357,21 +357,21 @@ const fetchCryptoData = async (): Promise<Record<string, number>> => {
       if (cgRes['shiba-inu']?.usd) map['shib'] = cgRes['shiba-inu'].usd;
     }
     return map;
-  } catch (e) { return {}; }
+  } catch (e) { return {} as Record<string, number>; }
 };
 
 export const fetchRealTimePrices = async (currentAssets: Asset[]): Promise<Asset[]> => {
   // STRICT FLOW: API -> AI -> Cache -> Offline
   try {
-    // Explicitly cast to Record<string, number> in catch to satisfy strict mode
+    // Explicitly cast to Record<string, number> in catch AND in assignment to satisfy strict mode
     const [sinaDataOrEmpty, cnyRate, cryptoDataOrEmpty] = await Promise.all([
       fetchSinaData().catch(() => ({} as Record<string, number>)),
       fetchForexRate().catch(() => 0),
       fetchCryptoData().catch(() => ({} as Record<string, number>))
     ]);
 
-    const sinaData = sinaDataOrEmpty;
-    const cryptoData = cryptoDataOrEmpty;
+    const sinaData = sinaDataOrEmpty as Record<string, number>;
+    const cryptoData = cryptoDataOrEmpty as Record<string, number>;
     
     const validCny = cnyRate || BASE_PRICES.usd_cny;
     const finalPrices: Record<string, number> = {};
