@@ -363,15 +363,15 @@ const fetchCryptoData = async (): Promise<Record<string, number>> => {
 export const fetchRealTimePrices = async (currentAssets: Asset[]): Promise<Asset[]> => {
   // STRICT FLOW: API -> AI -> Cache -> Offline
   try {
-    // Explicitly cast to Record<string, number> to prevent TS type inference errors
+    // Explicitly cast to Record<string, number> in catch to satisfy strict mode
     const [sinaDataOrEmpty, cnyRate, cryptoDataOrEmpty] = await Promise.all([
-      fetchSinaData().catch(() => ({})),
+      fetchSinaData().catch(() => ({} as Record<string, number>)),
       fetchForexRate().catch(() => 0),
-      fetchCryptoData().catch(() => ({}))
+      fetchCryptoData().catch(() => ({} as Record<string, number>))
     ]);
 
-    const sinaData = sinaDataOrEmpty as Record<string, number>;
-    const cryptoData = cryptoDataOrEmpty as Record<string, number>;
+    const sinaData = sinaDataOrEmpty;
+    const cryptoData = cryptoDataOrEmpty;
     
     const validCny = cnyRate || BASE_PRICES.usd_cny;
     const finalPrices: Record<string, number> = {};

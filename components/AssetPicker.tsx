@@ -31,7 +31,6 @@ export const AssetPicker: React.FC<AssetPickerProps> = ({ allAssets, visibleAsse
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>, position: number) => {
         dragItem.current = position;
         e.dataTransfer.effectAllowed = "move";
-        // Make the drag ghost transparent or styled if needed, defaults are usually okay
     };
 
     const handleDragEnter = (e: React.DragEvent<HTMLDivElement>, position: number) => {
