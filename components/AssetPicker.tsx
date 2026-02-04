@@ -1,8 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Asset, Language } from '../types';
 import { X, CheckSquare, Square, Search, GripVertical, Trash2, List, LayoutGrid } from 'lucide-react';
-import { Reorder } from 'framer-motion';
 
 interface AssetPickerProps {
     allAssets: Asset[];
@@ -16,6 +15,8 @@ interface AssetPickerProps {
 export const AssetPicker: React.FC<AssetPickerProps> = ({ allAssets, visibleAssetIds, onToggle, onReorder, onClose, lang }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState<'library' | 'sort'>('library');
+    const dragItem = useRef<number | null>(null);
+    const dragOverItem = useRef<number | null>(null);
 
     const filteredAssets = allAssets.filter(a => {
         const term = searchTerm.toLowerCase();
@@ -25,6 +26,33 @@ export const AssetPicker: React.FC<AssetPickerProps> = ({ allAssets, visibleAsse
     });
 
     const categories = Array.from(new Set(filteredAssets.map(a => a.category)));
+
+    // Native Drag and Drop Handlers
+    const handleDragStart = (e: React.DragEvent<HTMLDivElement>, position: number) => {
+        dragItem.current = position;
+        e.dataTransfer.effectAllowed = "move";
+        // Make the drag ghost transparent or styled if needed, defaults are usually okay
+    };
+
+    const handleDragEnter = (e: React.DragEvent<HTMLDivElement>, position: number) => {
+        dragOverItem.current = position;
+    };
+
+    const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+        const start = dragItem.current;
+        const end = dragOverItem.current;
+        
+        if (start !== null && end !== null && start !== end) {
+            const newOrder = [...visibleAssetIds];
+            const draggedItemContent = newOrder[start];
+            newOrder.splice(start, 1);
+            newOrder.splice(end, 0, draggedItemContent);
+            onReorder(newOrder);
+        }
+        
+        dragItem.current = null;
+        dragOverItem.current = null;
+    };
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
@@ -131,18 +159,22 @@ export const AssetPicker: React.FC<AssetPickerProps> = ({ allAssets, visibleAsse
                                     </button>
                                 </div>
                             ) : (
-                                <Reorder.Group axis="y" values={visibleAssetIds} onReorder={onReorder}>
-                                    {visibleAssetIds.map(id => {
+                                <div className="space-y-2">
+                                    {visibleAssetIds.map((id, index) => {
                                         const asset = allAssets.find(a => a.id === id);
                                         if (!asset) return null;
                                         return (
-                                            <Reorder.Item 
+                                            <div 
                                                 key={id} 
-                                                value={id}
-                                                className="bg-white dark:bg-[#252525] border border-gray-100 dark:border-gray-800 rounded-xl mb-2 p-3 flex items-center justify-between shadow-sm active:shadow-lg active:scale-[1.02] transition-all cursor-grab active:cursor-grabbing"
+                                                draggable
+                                                onDragStart={(e) => handleDragStart(e, index)}
+                                                onDragEnter={(e) => handleDragEnter(e, index)}
+                                                onDragEnd={handleDragEnd}
+                                                onDragOver={(e) => e.preventDefault()}
+                                                className="bg-white dark:bg-[#252525] border border-gray-100 dark:border-gray-800 rounded-xl p-3 flex items-center justify-between shadow-sm active:shadow-lg hover:border-blue-300 dark:hover:border-blue-700 cursor-grab active:cursor-grabbing transition-colors"
                                             >
                                                 <div className="flex items-center space-x-4">
-                                                    <div className="text-gray-400 dark:text-gray-600 cursor-grab active:cursor-grabbing">
+                                                    <div className="text-gray-400 dark:text-gray-600">
                                                         <GripVertical size={20} />
                                                     </div>
                                                     <div>
@@ -158,10 +190,10 @@ export const AssetPicker: React.FC<AssetPickerProps> = ({ allAssets, visibleAsse
                                                 >
                                                     <Trash2 size={18} />
                                                 </button>
-                                            </Reorder.Item>
+                                            </div>
                                         );
                                     })}
-                                </Reorder.Group>
+                                </div>
                             )}
                              <p className="text-center text-xs text-gray-400 mt-6 mb-2">
                                 {lang === 'zh' ? '拖动列表项进行排序' : 'Drag items to reorder'}
