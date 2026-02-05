@@ -177,6 +177,14 @@ const fetchSinaData = async (): Promise<Record<string, number>> => {
                 } else if (code.startsWith('gb_')) {
                     const v = parseFloat(parts[1]);
                     if (!isNaN(v) && v > 0) p = v;
+                } else if (code.startsWith('fx_')) { 
+                    // Forex
+                    const v = parseFloat(parts[1]); 
+                    if (!isNaN(v) && v > 0) p = v;
+                    else {
+                        const v2 = parseFloat(parts[3]);
+                         if (!isNaN(v2) && v2 > 0) p = v2;
+                    }
                 }
                 if (p > 0) results[code] = p;
             });
@@ -192,7 +200,8 @@ const fetchSinaData = async (): Promise<Record<string, number>> => {
 
 export const fetchRealTimePrices = async (currentAssets: Asset[]): Promise<Asset[]> => {
   try {
-    const sinaData = await fetchSinaData().catch(() => ({}));
+    // FIX: Cast catch return to satisfy strict TypeScript check
+    const sinaData = await fetchSinaData().catch(() => ({} as Record<string, number>));
     const finalPrices: Record<string, number> = {};
     const finalSources: Record<string, string[]> = {};
     const missingAssets: Asset[] = [];
