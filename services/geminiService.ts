@@ -44,10 +44,9 @@ try {
 const cleanJsonString = (str: string) => {
   if (!str) return "";
   let cleaned = str.trim();
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```(json)?\n?/, "").replace(/\n?```$/, "");
-  }
-  return cleaned;
+  // Remove markdown code blocks
+  cleaned = cleaned.replace(/^```json/i, "").replace(/^```/i, "").replace(/```$/i, "");
+  return cleaned.trim();
 };
 
 // Helper to safely parse strings with commas like "7,120.50"
@@ -112,6 +111,7 @@ export const fetchAssetAnalysis = async (asset: Asset, lang: Language): Promise<
     const prompt = `
       Analyze asset: ${asset.name} (${asset.symbol}) Price: ${asset.price}.
       Output language: ${lang === 'zh' ? 'Chinese' : 'English'}.
+      Current System Date: ${new Date().toLocaleDateString()}.
       Return JSON: { summary, sentiment (Bullish/Bearish/Neutral), keyLevels, advice }
     `;
 
@@ -119,6 +119,7 @@ export const fetchAssetAnalysis = async (asset: Asset, lang: Language): Promise<
       model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
+        tools: [{ googleSearch: {} }], // Enable search for analysis too
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -147,7 +148,7 @@ export const fetchMarketAnalysis = async (assets: Asset[], lang: Language): Prom
     if (!apiKey) throw new Error("API Key missing");
     const ai = new GoogleGenAI({ apiKey });
     
-    // Simple fallback
+    // Simple fallback logic since full market analysis is heavy
     return {
       summary: lang === 'zh' ? "AI 市场分析生成中..." : "Generating analysis...",
       sentiment: "Neutral",
@@ -172,12 +173,52 @@ export const sendChatQuery = async (
     if (!apiKey) return lang === 'zh' ? "请先配置 API Key" : "Please config API Key";
     
     const ai = new GoogleGenAI({ apiKey });
-    const prompt = `User: ${query}`; // Simplified for brevity in this fix
+    const currentDate = new Date().toLocaleString();
+    
+    // Construct context from asset list
+    const assetContext = allAssets.map(a => `${a.nameCN} (${a.price} ${a.unit})`).join(', ');
+
+    const systemContext = `
+      You are an Investment AI Assistant.
+      Current System Time: ${currentDate}.
+      If the user asks for the date, use the Google Search tool or the system time provided above.
+      
+      Live Prices Context: ${assetContext}.
+      
+      You MUST use the "googleSearch" tool if the user asks for:
+      1. Real-time news.
+      2. Dates, times, or "today".
+      3. Prices of assets not in the list.
+    `;
+
+    const prompt = `${systemContext}\n\nUser Query: ${query}`;
+
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: prompt
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }] // CRITICAL: ENABLE TOOLS FOR CHAT
+      }
     });
-    return response.text || "";
+
+    // Check for grounding metadata (source links)
+    const grounding = response.candidates?.[0]?.groundingMetadata;
+    let text = response.text || "";
+
+    // Append sources if available
+    if (grounding?.groundingChunks) {
+       const links = grounding.groundingChunks
+        .map((c: any) => c.web?.uri)
+        .filter((u: any) => !!u);
+       
+       if (links.length > 0) {
+           const uniqueLinks = [...new Set(links)].slice(0, 3);
+           const sourceLabel = lang === 'zh' ? '\n\n参考来源:' : '\n\nSources:';
+           text += `${sourceLabel}\n${uniqueLinks.map((l: any) => `- ${l}`).join('\n')}`;
+       }
+    }
+
+    return text;
   } catch (error) {
     return getReadableErrorMsg(error, lang);
   }
@@ -189,6 +230,7 @@ export const fetchLatestPricesViaAI = async (assetsToFetch: Asset[]): Promise<Re
     if (!apiKey || assetsToFetch.length === 0) return {};
 
     const ai = new GoogleGenAI({ apiKey });
+    const currentDate = new Date().toLocaleString();
     
     // Smaller chunks for better accuracy
     const chunkSize = 3; 
@@ -204,21 +246,22 @@ export const fetchLatestPricesViaAI = async (assetsToFetch: Asset[]): Promise<Re
         
         // ENHANCED PROMPT FOR HUILVBAO AND UNITS
         const prompt = `
-          Task: Find REAL-TIME prices for these assets.
-          Source Preference: "huilvbao.com" (汇率宝), Sina Finance, or Google Finance.
+          Current Date/Time: ${currentDate}.
+          Task: USE GOOGLE SEARCH to find REAL-TIME prices for these assets.
+          Do NOT use internal knowledge. Search for "latest price [Asset Name]".
           
-          CRITICAL UNIT CONVERSION RULES:
-          1. For "Shanghai Silver" (上海白银) or "Shanghai Gold" (上海黄金):
-             - If source is in CNY/kg (e.g., 7100), YOU MUST DIVIDE BY 1000 to get CNY/g (e.g., 7.10).
-             - Return ONLY the CNY/g price.
-          2. For "Shanghai Crude" (上海原油): Return CNY/bbl.
-          3. For "USD/CNY": Return current exchange rate (approx 7.1-7.3).
+          Sources Preference: "huilvbao.com", "sina finance", "google finance".
+
+          CRITICAL UNIT CONVERSION:
+          1. "Shanghai Silver" (上海白银): If price > 5000 (CNY/kg), DIVIDE BY 1000. Output CNY/g.
+          2. "Shanghai Gold" (上海黄金): Output CNY/g.
+          3. "Shanghai Crude" (上海原油): Output CNY/bbl.
 
           Assets:
           ${assetMap}
 
-          Output JSON keys must match IDs exactly. Values must be numbers (no strings).
-          Example Output: { "sh_silver": 7.15, "sh_gold": 625.50 }
+          Output JSON keys must match IDs exactly. Values must be numbers.
+          Example: { "sh_silver": 7.15, "sh_gold": 625.50 }
         `;
 
         try {
@@ -236,7 +279,6 @@ export const fetchLatestPricesViaAI = async (assetsToFetch: Asset[]): Promise<Re
                 const cleanTxt = cleanJsonString(txt);
                 const json = JSON.parse(cleanTxt);
                 Object.entries(json).forEach(([k, v]) => {
-                    // Use helper to parse potentially messy numbers
                     const val = parseFinancialNumber(v as string | number);
                     if (val > 0) results[k] = val;
                 });
