@@ -33,7 +33,8 @@ export const AssetCard: React.FC<AssetCardProps> = ({
   // Determine Badge Type
   let badge = null;
   const isCache = sources.includes('Cache');
-  const isAI = sources.includes('AI Search');
+  // Check if AI is source (fuzzy match for 'AI' to catch 'AI (Huilvbao)', 'AI Search' etc)
+  const isAI = sources.some(s => s.includes('AI'));
   const isOffline = sources.includes('Offline');
   const isAPI = sources.length > 0 && !isCache && !isAI && !isOffline;
   
@@ -63,10 +64,11 @@ export const AssetCard: React.FC<AssetCardProps> = ({
             </div>
           );
       } else if (isAI) {
-          return (
+           const aiLabel = sources.find(s => s.includes('AI')) || 'AI Search';
+           return (
             <div className="flex items-center space-x-0.5 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded text-[8px] font-bold border border-purple-100 dark:border-purple-800">
                 <BrainCircuit size={8} />
-                <span>AI Search</span>
+                <span className="truncate max-w-[80px]">{aiLabel}</span>
             </div>
           );
       } else if (isCache) {
