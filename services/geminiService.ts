@@ -7,20 +7,38 @@ try {
   const originalFetch = window.fetch;
   const proxyFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     let resource = input;
+    const targetHost = 'generativelanguage.googleapis.com';
+
     try {
-      const savedBaseUrl = localStorage.getItem('user_api_base_url');
-      const targetHost = 'generativelanguage.googleapis.com';
+      // 1. Check for Docker/Build-time configured Proxy (Priority)
+      // @ts-ignore
+      const buildTimeProxy = import.meta.env.VITE_API_BASE_URL; 
       
-      if (savedBaseUrl && typeof resource === 'string' && resource.includes(targetHost)) {
-         let cleanBase = savedBaseUrl.trim().replace(/\/$/, '');
-         if (!cleanBase.startsWith('http')) {
-           cleanBase = 'https://' + cleanBase;
+      // 2. Check for User configured Proxy (Settings)
+      const savedBaseUrl = localStorage.getItem('user_api_base_url');
+
+      if (typeof resource === 'string' && resource.includes(targetHost)) {
+         let newBase = '';
+
+         if (buildTimeProxy && buildTimeProxy.startsWith('/')) {
+             // If build-time proxy is a relative path (e.g., /api/proxy), use it directly
+             // This maps https://generativelanguage.googleapis.com/v1beta/... -> /api/proxy/v1beta/...
+             newBase = buildTimeProxy;
+             // Remove the protocol and host from the resource, keep the path
+             const urlObj = new URL(resource);
+             resource = `${newBase}${urlObj.pathname}${urlObj.search}`;
+         } 
+         else if (savedBaseUrl) {
+             // User custom full URL proxy
+             let cleanBase = savedBaseUrl.trim().replace(/\/$/, '');
+             if (!cleanBase.startsWith('http')) {
+               cleanBase = 'https://' + cleanBase;
+             }
+             resource = resource.replace(`https://${targetHost}`, cleanBase);
          }
-         const newUrl = resource.replace(`https://${targetHost}`, cleanBase);
-         resource = newUrl;
       }
     } catch (e) {
-      // ignore
+      // ignore parsing errors
     }
     
     try {

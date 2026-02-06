@@ -1,0 +1,19 @@
+
+version: '3.8'
+
+services:
+  invest-pilot:
+    build:
+      context: .
+      args:
+        # Replace this with your actual Google Gemini API Key
+        # Or create a .env file in the same directory with API_KEY=your_key
+        - API_KEY=${API_KEY}
+    image: ai-invest-pilot:latest
+    container_name: invest-pilot
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      # This ensures the frontend knows it's running in a proxied environment
+      - VITE_API_BASE_URL=/api/proxy
