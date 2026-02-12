@@ -94,7 +94,12 @@ const getReadableErrorMsg = (error: any, lang: Language): string => {
         : "Network Error: Check Proxy settings.";
   }
   if (msg.includes('401')) return lang === 'zh' ? "API Key 无效" : "Invalid API Key";
-  if (msg.includes('429')) return lang === 'zh' ? "配额已用尽" : "Quota Exceeded";
+  
+  // Updated Error Message for 429
+  if (msg.includes('429')) return lang === 'zh' ? "请求太快(429)，请稍等片刻" : "Rate limit (429). Please wait.";
+  
+  if (msg.includes('503')) return lang === 'zh' ? "AI 服务暂不可用" : "Service Unavailable";
+
   return lang === 'zh' ? "AI 服务异常" : "AI Service Error";
 };
 
@@ -109,7 +114,7 @@ const getFallbackAnalysis = (name: string, price: number, changePercent: number,
         : `AI Unavailable. ${name} at ${price}.`,
     sentiment: sentiment,
     keyLevels: "N/A",
-    advice: lang === 'zh' ? "请检查网络。" : "Check network.",
+    advice: lang === 'zh' ? "请检查网络或配额。" : "Check network/quota.",
     timestamp: Date.now()
   };
 };
@@ -159,9 +164,7 @@ export const fetchMarketAnalysis = async (assets: Asset[], lang: Language): Prom
   try {
     const { apiKey } = getEffectiveConfig();
     if (!apiKey) throw new Error("API Key missing");
-    const ai = new GoogleGenAI({ apiKey });
-    
-    // Simple fallback logic since full market analysis is heavy
+    // Placeholder to avoid heavy API usage on dashboard load
     return {
       summary: lang === 'zh' ? "AI 市场分析生成中..." : "Generating analysis...",
       sentiment: "Neutral",
@@ -245,8 +248,9 @@ export const fetchLatestPricesViaAI = async (assetsToFetch: Asset[]): Promise<Re
     const ai = new GoogleGenAI({ apiKey });
     const currentDate = new Date().toLocaleString();
     
-    // Smaller chunks for better accuracy
-    const chunkSize = 3; 
+    // OPTIMIZATION: Increased chunk size to 8 (was 3). 
+    // This dramatically reduces API requests per minute (RPM) to avoid 429 Errors.
+    const chunkSize = 8; 
     const chunks: Asset[][] = [];
     for (let i = 0; i < assetsToFetch.length; i += chunkSize) {
         chunks.push(assetsToFetch.slice(i, i + chunkSize));
@@ -254,21 +258,19 @@ export const fetchLatestPricesViaAI = async (assetsToFetch: Asset[]): Promise<Re
 
     const results: Record<string, number> = {};
 
-    await Promise.all(chunks.map(async (chunk) => {
+    // OPTIMIZATION: Sequential Execution instead of Promise.all
+    // Prevents burst requests which trigger rate limits instantly.
+    for (const chunk of chunks) {
         const assetMap = chunk.map(a => `ID: "${a.id}", Name: "${a.nameCN}" (${a.symbol})`).join('\n');
         
-        // ENHANCED PROMPT FOR HUILVBAO AND UNITS
         const prompt = `
           Current Date/Time: ${currentDate}.
-          Task: USE GOOGLE SEARCH to find REAL-TIME prices for these assets.
-          Do NOT use internal knowledge. Search for "latest price [Asset Name]".
-          
-          Sources Preference: "huilvbao.com", "sina finance", "google finance".
+          Task: FIND REAL-TIME PRICES.
+          Sources: "huilvbao", "sina", "yahoo finance".
 
           CRITICAL UNIT CONVERSION:
-          1. "Shanghai Silver" (上海白银): If price > 5000 (CNY/kg), DIVIDE BY 1000. Output CNY/g.
-          2. "Shanghai Gold" (上海黄金): Output CNY/g.
-          3. "Shanghai Crude" (上海原油): Output CNY/bbl.
+          1. "Shanghai Silver" > 5000 -> divide by 1000.
+          2. "Shanghai Gold" -> output CNY/g.
 
           Assets:
           ${assetMap}
@@ -297,9 +299,10 @@ export const fetchLatestPricesViaAI = async (assetsToFetch: Asset[]): Promise<Re
                 });
             }
         } catch (err) {
-            console.warn(`AI Price Fetch failed`, err);
+            console.warn(`AI Price Fetch chunk failed`, err);
+            // We do not re-throw here to allow other chunks or cached data to survive
         }
-    }));
+    }
 
     return results;
 
