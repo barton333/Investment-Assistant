@@ -153,14 +153,37 @@ const fetchSinaData = async (): Promise<Record<string, number>> => {
   const codes = Object.values(SINA_CODES_MAP);
   const results: Record<string, number> = {};
 
-  await Promise.all([
-     // Domestic Futures & Stocks
-     new Promise<void>(resolve => {
-        const id = `sina_hq_main_${Date.now()}`;
-        const script = document.createElement('script');
-        script.src = `https://hq.sinajs.cn/list=${codes.join(',')}`;
-        script.charset = 'gb2312';
-        script.onload = () => {
+  // IMPORTANT: Add timestamp to prevent browser caching
+  const timestamp = Date.now();
+  const scriptUrl = `https://hq.sinajs.cn/list=${codes.join(',')}&t=${timestamp}`;
+
+  return new Promise<Record<string, number>>(resolve => {
+    let completed = false;
+    const script = document.createElement('script');
+    
+    // Cleanup function
+    const cleanup = () => {
+      if (!completed) {
+        completed = true;
+        if (script.parentNode) script.parentNode.removeChild(script);
+        resolve(results);
+      }
+    };
+
+    // 1. TIMEOUT SAFETY (Max 3 seconds wait for Sina)
+    const timer = setTimeout(() => {
+        if (!completed) {
+            console.warn("Sina data fetch timed out");
+            cleanup();
+        }
+    }, 3000);
+
+    script.src = scriptUrl;
+    script.charset = 'gb2312';
+    
+    script.onload = () => {
+        clearTimeout(timer);
+        try {
             const win = window as any;
             codes.forEach(code => {
                 const str = win[`hq_str_${code}`];
@@ -188,20 +211,27 @@ const fetchSinaData = async (): Promise<Record<string, number>> => {
                 }
                 if (p > 0) results[code] = p;
             });
-            script.remove();
-            resolve();
-        };
-        script.onerror = () => { script.remove(); resolve(); };
-        document.body.appendChild(script);
-     })
-  ]);
-  return results;
+        } catch (err) {
+            console.error("Error parsing Sina data", err);
+        }
+        cleanup();
+    };
+
+    script.onerror = () => { 
+        clearTimeout(timer);
+        cleanup(); 
+    };
+
+    document.body.appendChild(script);
+  });
 };
 
 export const fetchRealTimePrices = async (currentAssets: Asset[]): Promise<Asset[]> => {
   try {
     // FIX: Cast catch return to satisfy strict TypeScript check
+    // Added timeout logic inside fetchSinaData, so this should resolve fast
     const sinaData = await fetchSinaData().catch(() => ({} as Record<string, number>));
+    
     const finalPrices: Record<string, number> = {};
     const finalSources: Record<string, string[]> = {};
     const missingAssets: Asset[] = [];
@@ -230,16 +260,21 @@ export const fetchRealTimePrices = async (currentAssets: Asset[]): Promise<Asset
     });
 
     // 2. AI Fallback (Huilvbao)
+    // Only fetch if we have missing assets and the network seems okay
     if (missingAssets.length > 0) {
-        const aiPrices = await fetchLatestPricesViaAI(missingAssets);
-        Object.entries(aiPrices).forEach(([id, price]) => {
-            if (price > 0) {
-                // Safety double check on unit
-                let finalP = price;
-                if (id === 'sh_silver' && finalP > 500) finalP = finalP / 1000;
-                setPrice(id, finalP, 'AI (Huilvbao)');
-            }
-        });
+        try {
+            const aiPrices = await fetchLatestPricesViaAI(missingAssets);
+            Object.entries(aiPrices).forEach(([id, price]) => {
+                if (price > 0) {
+                    // Safety double check on unit
+                    let finalP = price;
+                    if (id === 'sh_silver' && finalP > 500) finalP = finalP / 1000;
+                    setPrice(id, finalP, 'AI (Huilvbao)');
+                }
+            });
+        } catch (aiError) {
+            console.warn("AI Fallback failed", aiError);
+        }
     }
 
     // 3. Merge
@@ -289,6 +324,7 @@ export const fetchRealTimePrices = async (currentAssets: Asset[]): Promise<Asset
     return updatedAssets;
 
   } catch (e) {
+    console.error("Critical error in fetchRealTimePrices", e);
     return currentAssets;
   }
 };
