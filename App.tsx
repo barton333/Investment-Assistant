@@ -9,6 +9,7 @@ import { AssetDetailView } from './components/AssetDetailView';
 import { SettingsView } from './components/SettingsView';
 import { AdvisorView } from './components/AdvisorView';
 import { RefreshCw, ShieldCheck, Clock, AlertTriangle, Plus } from 'lucide-react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 const App: React.FC = () => {
   const [allAssets, setAllAssets] = useState<Asset[]>(getInitialAssets());
@@ -230,6 +231,7 @@ const App: React.FC = () => {
             lang={settings.language} 
           />
       )}
+      <SpeedInsights />
     </div>
   );
 };
